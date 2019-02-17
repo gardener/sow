@@ -11,12 +11,24 @@ fail() {
     exit 1
 }
 
+error() {
+    echo "$@">&2
+}
+ 
 info () {
     echo "$@"
 }
 
 debug() {
-    true
+  if [ -n "$DEBUG" ]; then
+    echo "$@"
+  fi
+}
+
+verbose() {
+  if [ -n "$VERBOSE" ]; then
+    echo "$@"
+  fi
 }
 
 exec_cmd() {
@@ -413,10 +425,12 @@ getrequiredjsonvalue() {
 
 lookupFileIn() {
   local opt="-f"
-  if [ "$1" == "-d" ]; then
-    opt="-d"
-    shift
-  fi
+  case "$1" in
+    -d) opt="-d"
+        shift;;
+    -x) opt="-x"
+        shift;;
+  esac
   local file="$1"
   shift
   for d in "$@"; do
@@ -428,7 +442,15 @@ lookupFileIn() {
 }
 
 lookupFile() {
-  lookupFileIn "$@" "$GENDIR" "$CURRENT" "$ROOT" "$GARDEN"
+  lookupFileIn "$@" "$GENDIR" "$CURRENT" "$PRODUCTDIR" "$ROOTPRODUCTDIR" "$ROOT" "$SOW"
+}
+
+lookupPlugin() {
+  lookupFileIn -x "plugins/$1/plugin" "$CURRENT" "$PRODUCTDIR" "$ROOTPRODUCTDIR" "$ROOT" "$SOW"
+}
+
+lookupStub() {
+  lookupFileIn "$1" "$CURRENT" "$PRODUCTDIR" "$ROOTPRODUCTDIR" "$ROOT" "$SOW"
 }
 
 ################################################################################

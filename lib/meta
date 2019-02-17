@@ -1,0 +1,16 @@
+
+
+getComponentMeta()
+{
+  getJSON $1 "components[\"$2\"]" METAJSON
+}
+
+getComponentMetaProduct()
+{
+  getValue $1 "product" $2
+}
+
+getMetaProductDir()
+{
+  getValue $1 "products[\"$2\"].dir" METAJSON
+}

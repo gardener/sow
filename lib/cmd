@@ -1,0 +1,77 @@
+
+############################################################################
+# commands
+############################################################################
+
+################
+# Resolve a shortcut for a given set of values
+# The resolution is found as follows  (in given order)
+# - the given value directly is identical to a possible choice
+# - if the given value is a prefix of the possible choice, then the first
+#   match is chosen.
+# - if the given value is part of the possible choice, then the first
+# - the given value
+#
+# $1:  the value to resolve
+# $2+: the possible choices
+################
+CMDS_resolve_shortcut()
+{
+  if ! contains "$1" "${@:2}"; then
+    for c in "${@:2}"; do
+      if [[ "$c" =~ ^$1.* ]];  then
+        echo "$c"
+        return 0
+      fi
+    done
+    for c in "${@:2}"; do
+      if [[ "$c" =~ .*$1.* ]];  then
+        echo "$c"
+        return 0
+      fi
+    done
+    for c in "${@:2}"; do
+      if [[ "$c" =~ .*$(sed -e 's/\(.\)/\1.*/g'<<<"$1") ]];  then
+        echo "$c"
+        return 0
+      fi
+    done
+  fi
+  echo "$1"
+}
+
+################
+#
+# $1: the command value
+# $2: the function prefix
+# $3: possible command completions (space separated)
+# $4+: command arguments
+# options:
+#   --invalid= function to call for invalid command
+################
+CMDS_execute_command()
+{
+  local errf=
+  
+  while [ $# -gt 0 -a "${1#--}" != "$1" ]; do 
+    case "$1" in
+      --invalid=*) errf="${1#--invalid=}";;
+      *) Error "unknown option $1";;
+    esac
+    shift
+  done
+
+  local cmd="$(CMDS_resolve_shortcut "$1" $3)"
+  if [ "$(type -t "$2$cmd")" == "function" ]; then
+    $2$cmd "${@:4}"
+  else
+    if [ -n "$errf" ]; then
+      $errf "$2" "$cmd" "${@:4}"
+    else
+      error "invalid command $cmd"
+      return 1
+    fi
+  fi
+}
+
+

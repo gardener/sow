@@ -1,5 +1,11 @@
 #!/bin/bash
 
+SOW="$(cd "$(dirname "${BASH_SOURCE[0]}")/.."; echo "$PWD" )"
+SOWLIB="$SOW/lib"
+
+export SOW
+export SOWLIB
+
 set -eo pipefail
 
 MAINPRODUCT="<main>"
@@ -9,6 +15,7 @@ nLANDSCAPE=acre
 fCONFIG=acre.yaml          # acre
 dCOMPONENTS=components  # species
 nCOMPONENT=species         # species
+nCOMPONENTS=species        # species
 fCOMPDEF=component.yaml    # species.yaml
 fACTIONDEF=deployment.yaml # guide.yaml
 dROOTPRODUCT=garden     # crop
@@ -53,8 +60,12 @@ setComponent()
   reldir=
   productdir="$(getProductDir "$1")"
   if [ -n "$productdir" ]; then
-    product="${productdir##*/}"
     reldir="${1#$ROOT/}"
+    if [ "$productdir" == "$ROOTPRODUCTDIR" ]; then
+      product="$MAINPRODUCT"
+    else
+      product="${productdir##*/}"
+    fi
     component="${1#$productdir/$dCOMPONENTS/}"
   fi
 }
@@ -100,7 +111,6 @@ if [ -n "$CURRENT" ]; then
     CURRENT=
   else
     PRODUCT="$product"
-    CURRENTRELDIR="$reldir"
     COMPONENT="$component"
   fi
 fi
@@ -113,12 +123,12 @@ META="$GEN/meta.json"
 
 mkdir -p "$GEN" "$STATE" "$EXPORT"
 
-if [ -f "$ROOTPRODUCTDIR/lib/$fCONFIG" ]; then
-  CONFIGJSON="$(spiff merge -json "$ROOT/$fCONFIG" "$ROOTPRODUCTDIR/lib/$fCONFIG")"
+if [ -f "$ROOTPRODUCTDIR/$fCONFIG" ]; then
+  CONFIGJSON="$(spiff merge -json "$ROOTPRODUCTDIR/$fCONFIG" "$ROOT/$fCONFIG")"
 else
   CONFIGJSON="$(spiff merge -json "$ROOT/$fCONFIG")"
 fi
-echo "$CONFIGJSON" >"$CONFIG"
+jq . <<<"$CONFIGJSON" >"$CONFIG"
 
 export GEN
 export STATE
@@ -130,5 +140,4 @@ export CURRENT
 export ROOTPRODUCTDIR
 export PRODUCTDIR
 export PRODUCT
-export CURRENTRELDIR
 export COMPONENT

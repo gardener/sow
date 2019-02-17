@@ -1,0 +1,246 @@
+#!/bin/bash
+
+ACTION_setup()
+{
+  CURRENT="${COMPONENTS["$1"]}"
+  if [ -z "$CURRENT" ]; then
+    fail "unknoen $nCOMPONENT $1"
+  fi
+  COMPONENT="$1"
+ 
+  local comp
+  getComponentMeta comp "$1"
+  getComponentMetaProduct PRODUCT comp
+  getMetaProductDir PRODUCTDIR "$PRODUCT"
+
+  export CURRENT="$ROOT/$CURRENT"
+  export PRODUCTDIR="$ROOT/$PRODUCTDIR"
+  export PRODUCT
+  export COMPONENT
+}
+
+# $1; component
+# $2: action
+ACTION_execute()
+{
+  (
+
+  ACTION_setup "$2"
+  action="$1"
+  shift 2
+
+  ##############################
+  # GENERATE COMPONENT FOLDERS #
+  ##############################
+
+  export GENDIR="$GEN/$COMPONENT"
+  export STATEDIR="$STATE/$COMPONENT"
+  export EXPORTDIR="$EXPORT/$COMPONENT"
+
+  mkdir -p "$STATEDIR" "$GENDIR" "$EXPORTDIR"
+
+  if [ -x "$ROOTPRODUCTDIR/lib/action" ]; then
+    source "$ROOTPRODUCTDIR/lib/action"
+  fi
+
+  export CONFIGJSON
+  export KUBECONFIG
+  export DOMAIN
+
+  if [ -x "$CURRENT/lib/action" ]; then
+    echo "using local action sctipt"
+    source "$CURRENT/lib/action"
+  fi
+
+  ####################
+  # HELPER FUNCTIONS #
+  ####################
+
+  _exec_configured_plugins() {
+    local order=cat
+    if [ "$action" == "delete" ]; then
+      order=tac
+    fi
+    while IFS="" read -r line; do
+      eval args=( $line )
+      if [ -n "${args[0]}" ]; then
+        if _is_function "${args[0]}"; then
+           "${args[0]}" "$action" "${args[@]:1}"
+        else
+           local plugin
+           plugin="$(lookupPlugin "${args[0]}")"
+           if [ -n "$plugin" ]; then
+             "$plugin" "$action" "${args[@]:1}"
+           else
+             fail "no action function or plugin with name '${args[0]}' found"
+           fi
+        fi
+      fi
+    done <<<"$(_jq_get_labeled_arg_list .plugins <<<"$DEPLOYMENTJSON" | $order)"
+  }
+
+  _deploy() {
+    _exec_configured_plugins deploy
+    if _is_function "deploy"; then
+       deploy "$@"
+    fi
+  }
+
+  _delete() {
+    if _is_function "delete"; then
+       delete "$@"
+    fi
+    _exec_configured_plugins delete
+  }
+
+  ####################
+  # HANDLE COMPONENT #
+  ####################
+
+  #
+  # evaluate component.yaml
+  #    imports:   # list of optionally labelled imported components
+  #    stubs:     # list of additional stub file for deployment processing
+  #
+  # imports:                                  imports:
+  #    - comp                                    label: comp
+  #    - label: comp
+  #
+  # imports are mapped to a yaml with a single key 'imports' as map of
+  # all export.yaml content of imported components using the label as key
+  # labels must be used for nested components (containing a /)
+  #
+  # stubs may be paths relative to the component or the garden folder
+  #
+  if [ -f "$CURRENT/$fCOMPDEF" ]; then
+      # evaluate imports
+      imports="{}"
+      declare -A import_map
+      getComponentJSON "$CURRENT/$fCOMPDEF"
+      getImports import_map COMPONENTJSON
+      for a in "${!import_map[@]}"; do
+          imp="${import_map[$a]}"
+          # remove leanding and trailing spaces
+          a="$(sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'<<<"$a")"
+          if [ -n "$a" -a -n "$imp" ]; then # clean spaces
+              if [ ! -f "$EXPORT/$imp/export.yaml" ]; then
+                  fail "imported $nCOMPONENT $imp not deployed yet"
+              fi
+              setjsonjson imports "imports.$(echo "$a")" "$(cat "$EXPORT/$imp/export.yaml" | spiff merge --json -)"
+          fi
+      done
+      echo "$imports" | jq . > "$GENDIR/import.json"
+
+      # evaluate additional stubs
+      _get_value_list slist stubs COMPONENTJSON
+      for i in "${slist[@]}"; do
+        local stub
+        stub="$(lookupStub "$i")"
+        if [ -z "$stub" ]; then
+          fail "stub '$i' not found"
+        fi
+        stubs=( "${stubs[@]}" "$stub" )
+      done
+  else
+      COMPONENTJSON="{ }"
+      echo "---" > "$GENDIR/import.json"
+      stubs=( )
+  fi
+  export COMPONENTJSON
+
+  #
+  # evaluate deployment.yaml
+  # uses additional stubs, config.json, imports and state.yaml as stubs
+  #
+  # key plugins is used to detect plugins to call.
+  # the plugin name map be used as map key to specify and argument list
+  # plugins:           plugins: name         plugins:       (->unordered)
+  #  - name                                     name:
+  #  - name:                                    - arg1
+  #    - arg1                                   - arg2
+  #    - arg2
+  #
+  # the plugins are executed in the given order
+
+  deploymentstubs=( )
+  deployment=
+
+  if [ ${#stubs[@]} -ne 0 ]; then
+    echo "using stubs ${stubs[@]}"
+  fi
+  if [ -f "$CURRENT/$fACTIONDEF" ]; then
+      if [ -f "$STATEDIR/state.yaml" ]; then
+          deploymentstubs=("$CURRENT/$fACTIONDEF" "${stubs[@]}" "$CONFIG" "$GENDIR/import.json" "$STATEDIR/state.yaml")
+      else
+          deploymentstubs=("$CURRENT/$fACTIONDEF" "${stubs[@]}" "$CONFIG" "$GENDIR/import.json")
+      fi
+      deployment="$(spiff merge --json "${deploymentstubs[@]}")"
+  fi
+  if [ -z "$deployment" ]; then
+    deployment="{}"
+  fi
+  export DEPLOYMENTJSON="$deployment"
+  spiff merge - <<<"$deployment" > "$GENDIR/$fACTIONDEF"
+
+  case "$action" in
+      (deploy) _deploy "$@";;
+      (delete) _delete "$@";;
+      (*) fail "unknown command $action";;
+  esac
+  
+  handle_state
+  handle_exports
+  )
+}
+
+handle_exports()
+{
+  if [ "$CMD" != "delete" -a -f "$CURRENT/export.yaml" ]; then
+      if [ -f "$STATEDIR/state.yaml" ]; then
+          spiff merge "$CURRENT/export.yaml" "${deploymentstubs[@]}" "$STATEDIR/state.yaml" > "$EXPORTDIR/export.yaml"
+      else
+          if [ -n "$DEPLOYMENTJSON" ]; then
+              echo "$DEPLOYMENTJSON" | spiff merge "$CURRENT/export.yaml" - > "$EXPORTDIR/export.yaml"
+          else
+              spiff merge "$CURRENT/export.yaml" > "$EXPORTDIR/export.yaml"
+          fi
+      fi
+
+      EXPORTJSON="$(spiff merge --json "$EXPORTDIR/export.yaml")"
+      _jq_get_value '(.files // empty) | keys[]' <<<"$EXPORTJSON" | while IFS= read -r line; do
+        getValue  p "files.$line.path" EXPORTJSON
+        if [ -z "$p" ]; then
+          p="$line"
+        fi
+        getValue data "files.$line.data" EXPORTJSON
+
+        echo "exporting file $p"
+        echo "$data" > "$EXPORTDIR/$p"
+      done
+  fi
+}
+
+restore() {
+    cp "$STATEDIR/state.yaml.bak"  "$STATEDIR/state.yaml"
+    exit 1
+}
+
+handle_state()
+{
+  if [ -f "$CURRENT/state.yaml" ]; then
+      if [ -f "$STATEDIR/state.yaml" ]; then
+          cp "$STATEDIR/state.yaml"  "$STATEDIR/state.yaml.bak"
+          if [ -n "$DEPLOYMENTJSON" ]; then
+              echo "$DEPLOYMENTJSON" | (spiff merge "$CURRENT/state.yaml" "$STATEDIR/state.yaml.bak" - > "$STATEDIR/state.yaml" || restore)
+          else
+              (spiff merge "$CURRENT/state.yaml" "$STATEDIR/state.yaml.bak" > "$STATEDIR/state.yaml" || restore)
+          fi
+      else
+          if [ -n "$DEPLOYMENTJSON" ]; then
+              echo "$DEPLOYMENTJSON" | spiff merge "$CURRENT/state.yaml" - > "$STATEDIR/state.yaml"
+          else
+              spiff merge "$CURRENT/state.yaml" > "$STATEDIR/state.yaml"
+          fi
+      fi
+  fi
+}

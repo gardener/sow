@@ -1,0 +1,209 @@
+
+################################################################
+# a simple option parser
+################################################################
+
+# configuration is given by an associative array
+# - The key is the option string or character
+# - The value might be
+#     # empty: flag option
+#     # =: value option (one value only)
+#     # name: alias name (for example long option name)
+#     # =name: alias name for a value option
+# The result is also stored into an associative array
+# - key defined means option set (for example flag option)
+# - value might be the value argument
+# Single charater options can be aggregated within a single-dashed 
+# option string. Single character or multi-character options many
+# be specified as double-dashed separate option string.
+# A double-dashed option string may specify a value separated by an
+# equals character (=). A value option without a directly specified
+# value consumes an additional argument (in the order of appearance
+# in a single-dashed option string). Option parsing is stopped
+# for the first non option argument or after the -- option.
+#
+# The variable _cnt is set to the number of the first argument
+# not belonging to an option.
+#
+# for example:  [o]= [a]="=arg" [v]="="
+#   -o -a value others    => [o]= [arg]=value, rest: others
+#   -oa value others    
+#   -o --arg value others    
+#   -o --arg=value others    
+#   -o --a value others    
+#   -o --a=value others    
+#   -voa value1 value2 others    => [o]= [arg]=value2 [v]=value1, rest: others
+
+################
+# indirect array acces
+################
+
+array_keys()
+{
+  eval echo "\${!$1[@]}"
+}
+
+array_get()
+{
+  eval echo "\${$1['$2']}"
+}
+
+array_set()
+{
+  eval echo "$1['$2']='$3'"
+}
+
+split_into_chars()
+{
+  if [ $# -gt 0 ]; then
+    for i; do 
+       echo "$i"
+    done | split_into_chars
+  else
+    grep -o .
+  fi
+}
+
+################
+# Prepare the option parsing
+# by evaluating alias names and filiing the _opts array
+#
+# $1: name of array containing the given option spec
+################
+_prepare_opts()
+{
+  for o in $(array_keys $1); do
+    local s="$(array_get $1 "$o")"
+    _opts["$o"]="$s"
+    debug "OPT: $o: $s"
+  done
+  for o in "${!_opts[@]}"; do
+    local s="${_opts[$o]}"
+    local n="${s#=}"
+    if [ -n "$n" ]; then
+      # alias found
+      if [ ${_opts[$n]-unset} ]; then
+        if [ "$n" == "$s" ]; then
+          _opts[$n]=
+          debug "+OPT: $n:"
+        else
+          _opts[$n]="="
+          debug "+OPT: $n: ="
+        fi
+      fi
+    fi
+  done
+}
+
+################
+# check for an option
+#
+# _opts: associative array with options indicating an additional argument
+# _cnt: next argument number after parsing
+# $1: candidate
+# $2: result associative array
+# $3+: args
+################
+_check_opt()
+{
+  local v
+  local k="${1%=*}"
+
+  if [ "$1" != "$k" ]; then
+    v="${1#*=}"
+  fi
+
+  if [ ${_opts[$k]+set} ]; then
+    local s="${_opts[$k]}"
+    local n="${s#=}"
+    if [ "$n" == "$s" ]; then
+      # no arg expected
+      if [ "$1" != "$k" ]; then
+        Error "no argument expected for option '$k'"
+      fi
+    else
+      if [ "$1" == "$k" ]; then
+        # no value in option string
+        if [ $# -le 2 ]; then
+          Error "argument expected for option '$k'"
+        fi
+        v="$3"
+        (( _cnt++ ))
+      fi
+    fi
+    if [ -n "$n" ]; then
+      k="$n"
+    fi
+    debug "$2['$k']='$v'"
+    eval "$2['$k']='$v'"
+  else 
+    Error "invalid option '$k'"
+  fi
+}
+
+################
+# parse simple flags
+# 
+# _cnt: next argument number after parsing
+# $1 string with flag characters
+# $2 name of associative array to fill with actual flags
+# $3+: args
+################
+OPT_parse_flags()
+{
+  declare -A _opts
+  local o
+  for o in $(split_into_chars "$1"); do
+    _opts[$o]=
+  done
+  _cnt=1
+  for a in "${@:3}"; do
+    case "$a" in
+      --)   (( _cnt++ ))
+            break;;
+      --*)  o="${a#--}"
+            _check_opt "$o" $2
+            (( _cnt++ ));;
+      -*)   for o in $(split_into_chars "${a:1}"); do
+              _check_opt "$o" $2
+            done
+            (( _cnt++ ));;
+      *)    break;;
+    esac
+  done
+}
+
+################
+# parse options
+# 
+# cnt: next argument number after parsing
+# $1 name of associative array containing the option specs
+# $2 name of associative array to fill with actual options
+# $3+: args
+################
+OPT_parse_options()
+{
+  declare -A _opts
+  local o
+  local a
+  local r="$2"
+  _prepare_opts "$1"
+  _cnt=1
+  shift 2
+  while [ $# -ge $_cnt ]; do
+    eval "a=\"\$$_cnt\""
+    debug "HANDLE $a"
+    case "$a" in
+      --)   (( _cnt++ ))
+            break;;
+      --*)  (( _cnt++ ))
+            o="${a#--}"
+            _check_opt "$o" $r "${@:$_cnt}";;
+      -*)   (( _cnt++ ))
+            for o in $(split_into_chars "${a:1}"); do
+              _check_opt "$o" $r "${@:$_cnt}"
+            done;;
+      *)    break;;
+    esac
+  done
+}

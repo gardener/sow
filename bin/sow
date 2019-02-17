@@ -1,11 +1,17 @@
+#!/bin/bash
 #!/usr/bin/env bash
+
+VERSION=0.1
 
 SOW="$(cd "$(dirname "${BASH_SOURCE[0]}")/.."; echo "$PWD" )"
 SOWLIB="$SOW/lib"
 
-export SOWLIB
 source "$SOWLIB/utils"
+source "$SOWLIB/meta"
 source "$SOWLIB/env"
+source "$SOWLIB/opts"
+source "$SOWLIB/cmd"
+source "$SOWLIB/action"
 
 setupProductMeta()
 {
@@ -21,7 +27,7 @@ setupProductMeta()
   PRODUCTS["$product"]="$rel"
   setjsonvalue METAJSON "products[\"$product\"].dir" "$rel"
 
-  echo "found product $product: $rel"
+  verbose "found product $product: $rel"
   while IFS= read -r line; do
     setupComponentMeta "$line"
   done < <(find "$1/$dCOMPONENTS" -name $fCOMPDEF)
@@ -36,7 +42,7 @@ setupProductMeta()
 setupComponentMeta()
 {
   setComponent "${1%/*}"
-  echo "  $component: $reldir"
+  verbose "  $component: $reldir ($product)"
   getComponentJSON "$line"
   declare -A import_map
   getImports import_map COMPONENTJSON
@@ -56,7 +62,8 @@ setupComponentMeta()
   fi
   local cnt=0
   for i in "${!import_map[@]}"; do
-    echo "    $i: ${import_map["$i"]}"
+    i="$(sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'<<<"$i")"
+    verbose "    $i: ${import_map["$i"]}"
     setjsonvalue METAJSON "components[\"$component\"].imports[$cnt].label" "$i"
     setjsonvalue METAJSON "components[\"$component\"].imports[$cnt].component" "${import_map["$i"]}"
     if [ $active == true ]; then
@@ -66,13 +73,297 @@ setupComponentMeta()
   done
 }
 
+###########################################################################
+# commands
+###########################################################################
 
-echo "$nLANDSCAPE = $ROOT"
-echo "$nLANDSCAPE $nPRODUCT = $ROOTPRODUCTDIR"
-echo "$nPRODUCT = $PRODUCT"
-echo "$nCOMPONENT = $COMPONENT"
-echo "$nCOMPONENT dir = $CURRENT ($CURRENTRELDIR)"
+get_version()
+{
+  echo "$nTOOL version $VERSION"
+}
 
+# missing command handler
+# $1: prefix of missing command function
+# $2: command name
+# $3+: command arguments
+handle_action_command()
+{
+  if [ "$(type -t "$1$2")" == "function" ]; then
+    $1$2 "${@:3}"
+  else
+    CMD_deploy "${@:2}"
+  fi
+}
+
+help()
+{
+  echo "$nTOOL - a tiny installer framework based on components and plugins"
+  echo
+  echo "$nTOOL [<options>] [<command>]"
+  echo 
+  echo "options:"
+  echo "  -a         complete the $nCOMPONENT set"
+  echo "  -A         use all $nCOMPONENTS if no one is specified"
+  echo "  -v         verbose mode"
+  echo "  -t         trace mode"
+  echo "  -D         debug mode"
+  echo "  --version  show version"
+  echo
+  echo "commands:"
+  echo "  info"
+  echo "  show {<components>}"
+  echo "  deploy {<components>}"
+  echo "  delete {<components>}"
+}
+
+showComponent()
+{
+  local c="$1"
+  local order
+  local comp
+  local active
+  local prod
+  local imps
+  local label
+  local dep
+  local dir
+  local i
+
+  info " - $c: ${COMPONENTS[$c]}"
+  getComponentMeta comp "$c"
+  getComponentMetaProduct prod comp
+  getMetaProductDir dir "$prod"
+  info "     $nPRODUCT: $prod ($dir)"
+  getValue active active comp
+  info "     active: $active"
+  info "     dependencies:"
+  getJSONList imps "imports" comp
+  for i in "${imps[@]}"; do
+    getValue label label i
+    getValue dep component i
+    info "     - $label: $dep"
+  done
+  getJSON comp "closures[\"$c\"]" METAJSON
+  getValueList order "order" comp
+  info "     $nTOOL order:"
+  for i in "${order[@]}"; do
+    info "     - $i"
+  done
+}
+
+CMD_help()
+{
+  help
+  exit 0
+}
+
+CMD_version()
+{
+  get_version
+  exit 0
+}
+
+CMD_info()
+{
+  local order
+  local comp
+  local active
+  local prod
+  local imps
+  local label
+  local dep
+  local i
+  info "$nCOMPONENTS:"
+  for c in "${!COMPONENTS[@]}"; do
+    showComponent "$c"
+  done
+  echo 
+  order=( )
+  getValueList order order METAJSON
+  info "$nTOOL order: ${order[@]}"
+}
+
+
+CMD_show()
+{ 
+  execClosure _CMD_show "$@"
+}
+
+_CMD_show()
+{
+  local comp
+  local active
+  local label
+  local dep
+
+  FAILED=
+   for c in "$@"; do
+     showComponent "$c"
+   done
+}
+
+CMD_deploy()
+{
+  execClosure _CMD_deploy "$@"
+}
+
+_CMD_deploy()
+{
+  for c in "${@}"; do
+    if ! contains "$c" "${order[@]}"; then
+      fail "$nCOMPONENT $c not found in ${nTOOL}ing order"
+    fi
+  done
+  for c in "${order[@]}"; do
+    if contains "$c" "${comps[@]}"; then
+      echo "${nTOOL}ing $nCOMPONENT $c"
+      ACTION_execute deploy "$c" 
+    fi
+  done
+}
+
+CMD_delete()
+{
+  execClosure _CMD_delete "$@"
+}
+
+_CMD_delete()
+{
+  for c in "${@}"; do
+    if ! contains "$c" "${order[@]}"; then
+      fail "$nCOMPONENT $c not found in ${nTOOL}ing order"
+    fi
+  done
+  for c in "${order[@]}"; do
+    if contains "$c" "${comps[@]}"; then
+      echo "${nTOOL}ing $nCOMPONENT $c"
+      ACTION_execute deploy "$c" 
+    fi
+  done
+}
+
+execClosure()
+{
+  local cmd="$1"
+  local order=( )
+  local tmp=( )
+  local comps=( )
+  local o
+  shift
+
+  resolveComponents "$@"
+
+  getValueList tmp order METAJSON
+  if [ "$cmd" == _CMD_delete ]; then
+    for o in "${tmp[@]}"; do
+      order=( "$o" "${order[@]}" )
+    done
+  else
+    order=( "${tmp[@]}" )
+  fi
+
+  if [ ${#comps[@]} -eq 0 ]; then
+    if [ ${opts[All]+set} ]; then
+       comps=( "${order[@]}" )
+    else
+      if [ -z "$COMPONENT" ]; then
+        fail "not in a $nCOMPONENT"
+      else
+        comps=( "$COMPONENT" )
+      fi
+    fi
+  fi
+
+  local cnt=0
+  if [ ${opts[all]+set} ]; then
+     tmp=( )
+     for o in "${order[@]}"; do
+       tmp=( "${tmp[@]}" "$o" )
+       if contains "$o" "${comps[@]}"; then
+         (( cnt+=1 ))
+         if [ $cnt -eq ${#comps[@]} ]; then
+           break
+         fi
+       fi
+     done
+     comps=( "${tmp[@]}" )
+  fi
+
+  $cmd "${comps[@]}" 
+}
+
+resolveComponents()
+{
+  comps=( )
+  for s in "$@"; do
+     c="$(CMDS_resolve_shortcut "$s" "${!COMPONENTS[@]}")"
+     if [ -z "$c" ]; then
+       fail "unknown $nCOMPONENT $s"
+     else
+       if ! contains "$c" "${comps[@]}"; then
+         comps=( "${comps[@]}" "$c" )
+       fi
+     fi
+  done
+}
+
+###########################################################################
+# main
+###########################################################################
+
+declare -g -A opts
+declare -g -A params
+params=( [a]=all [A]=All [v]=verbose [version]="" [dryrun]="" [x]=trace [D]=debug )
+OPT_parse_options params opts "$@"
+shift $(( _cnt - 1 ))
+
+if [ ${opts[version]+set} ]; then
+  get_version
+  exit 0
+fi
+
+if [ ${opts[verbose]+set} ]; then
+  VERBOSE=X
+else
+  VERBOSE=
+fi
+
+if [ ${opts[debug]+set} ]; then
+  DEBUG=X
+else
+  DEBUG=
+fi
+
+if [ ${opts[dryrun]+set} ]; then
+  DRYRUN=X
+else
+  DRYRUN=
+fi
+
+export DRYRUN
+export DEBUG
+export VERBOSE
+
+CMDS=( deploy delete info show help version )
+cmd="$(CMDS_resolve_shortcut "$1" "${CMDS[@]}")"
+
+if [ "$cmd" == version -o "$cmd" == help ]; then
+  CMD_$cmd
+fi
+
+if [ ${opts[trace]+set} ]; then 
+  set -x
+fi
+
+verbose "$nLANDSCAPE = $ROOT"
+verbose "$nLANDSCAPE $nPRODUCT = $ROOTPRODUCTDIR"
+if [ -n "$PRODUCT" ]; then
+  verbose "$nPRODUCT = $PRODUCT"
+  if [ -n "$COMPONENT" ]; then
+    verbose "$nCOMPONENT = $COMPONENT"
+    verbose "$nCOMPONENT dir = $CURRENT ($CURRENTRELDIR)"
+  fi
+fi
 
 declare -A PRODUCTS COMPONENTS
 METAJSON="{}"
@@ -114,6 +405,6 @@ if [ -n "$FAILED" ]; then
   fail "aborted due to dependency problems"
 fi
 
-order=( )
-getValueList order order METAJSON
-echo "$nTOOL order: ${order[@]}"
+
+CMDS_execute_command --invalid=handle_action_command "$cmd" CMD_ "${CMDS[*]}" "${@:2}"
+
