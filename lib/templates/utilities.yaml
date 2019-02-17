@@ -1,0 +1,12 @@
+
+landscape: (( &template ))
+
+utilities:
+  <<: (( &temporary(merge || ~) ))
+
+  templateForAllClusters: (( lambda |t|->map[landscape.clusters|index,cluster|->*t] ))
+  lambdaForAllClusters: (( lambda |f|->map[landscape.clusters|index,cluster|->(lambda f)(index,cluster)] ))
+
+  joinlists: (( lambda |lists|->sum[lists|[]|s,l|-> s l] ))
+
+  svcHosts: (( lambda |svc,ns|->($x=[svc, ns, "svc", "cluster", "local"]) sum[x|[]|s,i,v|-> s join(".",x.[0..i])]  ))

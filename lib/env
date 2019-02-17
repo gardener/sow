@@ -1,0 +1,134 @@
+#!/bin/bash
+
+set -eo pipefail
+
+MAINPRODUCT="<main>"
+
+nTOOL=sow
+nLANDSCAPE=acre
+fCONFIG=acre.yaml          # acre
+dCOMPONENTS=components  # species
+nCOMPONENT=species         # species
+fCOMPDEF=component.yaml    # species.yaml
+fACTIONDEF=deployment.yaml # guide.yaml
+dROOTPRODUCT=garden     # crop
+nPRODUCT=nursery           # nursery
+dPRODUCTS=nurseries        # nurseries
+
+determineCurrent()
+{(
+  if [ "$(pwd)" == "$ROOT" ]; then
+    return
+  fi
+  while [ ! -f $fCOMPDEF ]; do
+    cd ..
+    if [ "$(pwd)" == / ]; then
+      return
+    fi
+    if [ "$(pwd)" == "$ROOT" ]; then
+      return
+    fi
+  done
+  pwd
+)}
+
+getProductDir()
+{
+  local dir="$1"
+  if [ "$dir" == "$ROOT" ]; then
+    return
+  fi
+  while [ "${dir##*/}" !=  $dCOMPONENTS ]; do
+    if [ "$dir" == "$ROOT" ]; then
+      return
+    fi
+    dir="${dir%/*}"
+  done
+  echo "${dir%/*}"
+}
+
+setComponent()
+{
+  product=
+  reldir=
+  productdir="$(getProductDir "$1")"
+  if [ -n "$productdir" ]; then
+    product="${productdir##*/}"
+    reldir="${1#$ROOT/}"
+    component="${1#$productdir/$dCOMPONENTS/}"
+  fi
+}
+
+
+determineRoot()
+{(
+  while [ ! -f $fCONFIG -o ! -d $dROOTPRODUCT ]; do
+    cd ..
+    if [ "$(pwd)" == / ]; then
+      fail "no $nLANDSCAPE found to $nTOOL"
+    fi
+  done
+  pwd
+)}
+
+getComponentJSON()
+{
+  COMPONENTJSON="$(spiff merge --json "$1" "$CONFIG")"
+  if [ -z "$COMPONENTJSON" ]; then
+    COMPONENTJSON="{}"
+  fi
+}
+
+getImports()
+{
+  _get_labeled_value_list $1 .component.imports <<<"${!2}"
+}
+
+ROOT="$(determineRoot)"
+export ROOT
+
+export ROOTPRODUCTDIR="$ROOT/$dROOTPRODUCT"
+export GEN="$ROOT/gen"
+export STATE="$ROOT/state"
+export EXPORT="$ROOT/export"
+
+CURRENT="$(determineCurrent)"
+if [ -n "$CURRENT" ]; then
+  setComponent "$CURRENT"
+  PRODUCTDIR="$productdir"
+  if [ -z "$PRODUCTDIR" ]; then
+    CURRENT=
+  else
+    PRODUCT="$product"
+    CURRENTRELDIR="$reldir"
+    COMPONENT="$component"
+  fi
+fi
+
+GEN="$ROOT/gen"
+STATE="$ROOT/state"
+EXPORT="$ROOT/export"
+CONFIG="$GEN/config.json"
+META="$GEN/meta.json"
+
+mkdir -p "$GEN" "$STATE" "$EXPORT"
+
+if [ -f "$ROOTPRODUCTDIR/lib/$fCONFIG" ]; then
+  CONFIGJSON="$(spiff merge -json "$ROOT/$fCONFIG" "$ROOTPRODUCTDIR/lib/$fCONFIG")"
+else
+  CONFIGJSON="$(spiff merge -json "$ROOT/$fCONFIG")"
+fi
+echo "$CONFIGJSON" >"$CONFIG"
+
+export GEN
+export STATE
+export EXPORT
+export CONFIG
+export META
+
+export CURRENT
+export ROOTPRODUCTDIR
+export PRODUCTDIR
+export PRODUCT
+export CURRENTRELDIR
+export COMPONENT

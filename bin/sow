@@ -1,0 +1,119 @@
+#!/usr/bin/env bash
+
+SOW="$(cd "$(dirname "${BASH_SOURCE[0]}")/.."; echo "$PWD" )"
+SOWLIB="$SOW/lib"
+
+export SOWLIB
+source "$SOWLIB/utils"
+source "$SOWLIB/env"
+
+setupProductMeta()
+{
+  local d
+  local product
+  local rel
+
+  rel="${1#$ROOT/}"
+  product="${2:-${1##*/}}"
+  if [ -n "${PRODUCTS["$product"]}" ]; then
+    fail "product $product ($rel) defined twice; ${PRODUCTS["$product"]}"
+  fi
+  PRODUCTS["$product"]="$rel"
+  setjsonvalue METAJSON "products[\"$product\"].dir" "$rel"
+
+  echo "found product $product: $rel"
+  while IFS= read -r line; do
+    setupComponentMeta "$line"
+  done < <(find "$1/$dCOMPONENTS" -name $fCOMPDEF)
+
+  for d in "$1/$dPRODUCTS"/*; do
+    if [ -d "$d" ]; then
+      setupProductMeta "$d"
+    fi
+  done
+}
+
+setupComponentMeta()
+{
+  setComponent "${1%/*}"
+  echo "  $component: $reldir"
+  getComponentJSON "$line"
+  declare -A import_map
+  getImports import_map COMPONENTJSON
+  getValue active component.active COMPONENTJSON
+  if [ -z "$active" ]; then
+    active=true
+  fi
+
+  COMPONENTS["$component"]="$reldir"
+
+  setjsonvalue METAJSON "components[\"$component\"].active" "$active"
+  setjsonvalue METAJSON "components[\"$component\"].dir" "$reldir"
+  setjsonvalue METAJSON "components[\"$component\"].product" "$product"
+  setjsonjson METAJSON "components[\"$component\"].imports" "[]"
+  if [ $active == true ]; then
+    setjsonjson METAJSON "graph[\"$component\"]" "[]"
+  fi
+  local cnt=0
+  for i in "${!import_map[@]}"; do
+    echo "    $i: ${import_map["$i"]}"
+    setjsonvalue METAJSON "components[\"$component\"].imports[$cnt].label" "$i"
+    setjsonvalue METAJSON "components[\"$component\"].imports[$cnt].component" "${import_map["$i"]}"
+    if [ $active == true ]; then
+      setjsonvalue METAJSON "graph[\"$component\"][$cnt]" "${import_map["$i"]}"
+    fi
+    (( cnt+=1 ))
+  done
+}
+
+
+echo "$nLANDSCAPE = $ROOT"
+echo "$nLANDSCAPE $nPRODUCT = $ROOTPRODUCTDIR"
+echo "$nPRODUCT = $PRODUCT"
+echo "$nCOMPONENT = $COMPONENT"
+echo "$nCOMPONENT dir = $CURRENT ($CURRENTRELDIR)"
+
+
+declare -A PRODUCTS COMPONENTS
+METAJSON="{}"
+
+setupProductMeta "$ROOTPRODUCTDIR" "$MAINPRODUCT"
+
+METAJSON="$(spiff merge --json "$SOW/helper/closure.yaml" - "$SOWLIB/templates/graph.yaml" <<<"$METAJSON")"
+echo "$METAJSON" | jq .>"$META"
+
+cycles=( )
+getJSONList cycles cycles METAJSON
+
+FAILED=
+if [ ${#cycles[@]} -ne 0 ]; then
+   info "found dependency cycles:"
+   for c in "${cycles[@]}"; do
+     cycle=( )
+     getValueList cycle "" c
+     echo "--> ${cycle[@]}"
+   done
+   FAILED=X
+fi
+
+msg="found missing dependencies:"
+for c in "${!COMPONENTS[@]}"; do
+  missing=( )
+  getValueList missing "closures[\"$c\"].missing" METAJSON
+  if [ ${#missing[@]} -ne 0 ]; then
+    if [ -n "$msg" ]; then
+      echo "$msg"
+      msg=
+    fi
+    echo "--> $c: ${missing[@]}"
+    FAILED=X
+  fi
+done
+
+if [ -n "$FAILED" ]; then
+  fail "aborted due to dependency problems"
+fi
+
+order=( )
+getValueList order order METAJSON
+echo "$nTOOL order: ${order[@]}"

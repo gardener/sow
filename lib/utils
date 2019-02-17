@@ -1,0 +1,513 @@
+#!/usr/bin/env bash
+
+set -e
+
+################################################################################
+# standard utils
+################################################################################
+
+fail() {
+    echo "Error: $@">&2
+    exit 1
+}
+
+info () {
+    echo "$@"
+}
+
+debug() {
+    true
+}
+
+exec_cmd() {
+  if [ -n "$DRYRUN" ]; then
+    echo "$@"
+  else
+    "$@"
+  fi
+}
+
+_is_function()
+{
+   [ "$(type -t "$1")" == function ]
+}
+
+#
+# res: result associative array
+# read successive lines with key and value
+# and add to the associative array
+_read_hash()
+{
+  local line
+  hash=( )
+  while  read -r label value; do
+    if [ -n "$label" ]; then
+      eval $1[\"\$label\"]=\"\$value\"
+    fi
+  done
+}
+
+contains()
+{
+  local i
+  local elem="$1"
+  shift
+  for i in "$@"; do
+    if [ "$i" == "$elem" ]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+executionLoop()
+{
+  local cmd="$1"
+  local var="$2"
+  local _values=( )
+  shift 2
+
+  eval _values=( \"\${"$var[@]"}\" )
+
+  local _i
+  local _n=${#_values[@]}
+
+  if [ $_n -eq 0 ]; then
+    return
+  fi
+  for _i in $(seq 0 $((_n - 1))); do
+    if [ "$cmd" == delete ]; then
+      _i=$((_n - _i - 1))
+      order=tac
+    else
+      order=cat
+    fi
+    "$1" "$cmd" $_i "${_values[$_i]}" "${@:2}"
+  done
+}
+
+############################################################################
+# yaml and json access
+############################################################################
+
+#
+# get a value field from json
+#
+_jq_get_value()
+{
+  jq -r "($1)? // empty"
+}
+
+_jq_get_value_for_shell()
+{
+  jq -r "select($1 != null) | $1  | @sh"
+}
+
+# get second argument if first one not found
+_jq_get_defaulted_value()
+{
+  jq -r '('$1') // "'$2'"'
+}
+
+# get second argument shell-escaped, if first one not found
+_jq_get_defaulted_value_for_shell()
+{
+  jq -r '(('$1') // "'$2'" ) | @sh'
+}
+
+_jq_get_json()
+{
+  jq -r "(($1) // empty) | tojson"
+}
+
+_jq_get_json_for_shell()
+{
+  jq -r "(($1) // empty) | tojson | @sh"
+}
+
+_jq_get_value_or_json_for_shell()
+{
+  jq -r '(('"$1"') // empty) | if type == "array" or type == "object" then [ "json", tojson ] else [ "value", . ] end | @sh'
+}
+
+_jq_get_value_list_for_shell()
+{
+  local value="$(echo "${3:-$1}" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"
+  jq -r '(('"$1"') // empty) | if type == "array" then . elif type == "object" then error("expected list for '"$value"'") else [.] end | @sh'
+}
+
+_jq_get_json_list_for_shell()
+{
+  local value="$(echo "${3:-$1}" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"
+  jq -r '(('"$1"') // empty) | if type == "array" then . elif type != "object" then error("expected list for '"$value"'") else [.] end | .[] | tojson | @sh'
+}
+
+#
+# extract a label mapping list from json
+# supporting different formats: lists, objects or single values
+# result:   sequence of "<label> <value>" pairs
+#
+_jq_get_labeled_value_list()
+{
+  jq -r '('$1' // empty) | if type == "object" then . as $m | keys[] | [.,$m[.]] elif type == "array" then .[] | if type == "object" then . as $m | keys[] | [.,$m[.]] else [.,.] end else . end | join("  ")'
+}
+
+
+#
+# extract a sequence of labeled arg lists from json
+# result: sequence of "<arg1>" .. "<argn>" tupels
+#
+_jq_get_labeled_arg_list()
+{
+  jq -r '('$1' // empty) | if type == "array" then .[] | if type == "object" then . as $m | keys[] | [ .,  ($m[.] | if type == "array" then .[] else . end)] else [.] end elif type == "object" then . as $m | keys[] | [ ., $m[.][]] else [.] end | @sh '
+}
+
+#
+# get a json field mapped to a string mapping
+_get_labeled_value_list()
+{
+  _read_hash $1 < <(_jq_get_labeled_value_list "$2")
+}
+
+__get() {
+  if [ -n "$3" ]; then
+     v="$(eval echo \"\${"$3"}\" | $1 ".$2")"
+  else
+     v="$($1 ".$2")"
+  fi
+}
+
+_get_value() {
+  __get _jq_get_value_for_shell "${@:2}"
+  eval $1="$v"
+}
+
+_get_json() {
+  __get _jq_get_json_for_shell "${@:2}"
+  eval $1="$v"
+}
+
+_get_value_list() {
+  __get _jq_get_value_list_for_shell "${@:2}"
+  eval $1="( $v )"
+}
+
+_get_json_list() {
+  __get _jq_get_json_list_for_shell "${@:2}"
+  eval $1="( $v )"
+}
+
+_get_value_or_json() {
+  __get _jq_get_value_or_json_for_shell "${@:2}"
+  eval $1="( $v )"
+}
+
+
+_get_config_value() {
+  _get_value "$@" <<<"$CONFIGJSON"
+}
+
+getConfigValue() {
+  local v
+  _get_config_value "$@"
+}
+
+getRequiredConfigValue() {
+  local v
+  _get_config_value "${@}"
+  eval v=$v
+  if [ -z "$v" ]; then
+    fail "configuration attribute '$2' is required"
+  fi
+}
+
+
+_get_config_json() {
+  _get_json "$@"  <<<"$CONFIGJSON"
+}
+
+getConfigJSON() {
+  local v
+  _get_config_json "$@"
+}
+
+getRequiredConfigJSON() {
+  local v
+  _get_config_json "${@}"
+  eval v=$v
+  if [ -z "$v" ]; then
+    fail "configuration attribute '$2' is required"
+  fi
+}
+
+
+_get_config_value_list() {
+  _get_value_list "$@" <<<"$CONFIGJSON"
+}
+
+getConfigValueList() {
+  local v
+  _get_config_value_list "$@"
+}
+
+getRequiredConfigValueList() {
+  local v
+  _get_config_value_list "$@"
+  eval v=( $v )
+  if [ "${#v[@]}" -eq 0 ]; then
+    fail "configuration attribute '$2' is required"
+  fi
+}
+
+
+
+_get_config_json_list() {
+  _get_json_list "$@" <<<"$CONFIGJSON"
+}
+
+getConfigJSONList() {
+  local v
+  _get_config_json_list "$@"
+}
+
+getRequiredConfigJSONList() {
+  local v
+  _get_config_json_list "$@"
+  eval v=( $v )
+  if [ "${#v[@]}" -eq 0 ]; then
+    fail "configuration attribute '$2' is required"
+  fi
+}
+
+#######################################
+
+
+getKeys() {
+  _get_value_list "$1" "$2 | keys" "$3"
+}
+
+getValue() {
+  local v
+  _get_value "$@"
+}
+
+getRequiredValue() {
+  local v
+  _get_value "${@}"
+  eval v=$v
+  if [ -z "$v" ]; then
+    if [ -n "$4" ]; then
+      fail "$4: configuration attribute '$2' is required"
+    else
+      fail "configuration attribute '$2' is required"
+    fi
+  fi
+}
+
+getJSON() {
+  local v
+  _get_json "$@"
+}
+
+getValueOrJSON() {
+  local v
+  _get_value_or_json "$@"
+}
+
+getValueList() {
+  local v
+  _get_value_list "$@"
+}
+
+getJSONList() {
+  local v
+  _get_json_list "$@"
+}
+
+getJSONList() {
+  local v
+  _get_json_list "$@"
+}
+
+################################################################################
+# pod utilities
+################################################################################
+
+lookuppod() {
+    # Doesn't work out of the box with jq on CoreOS
+    ext=
+    if [ "$1" == -d ]; then
+        shift
+        ext="-[a-z0-9]{9}"
+    fi
+    kubectl -n $1 get pods | (egrep "$2$ext-[a-z0-9]{5} " || true) | (grep Running || true)
+}
+
+checkpod() {
+    name="$2"
+    if [ $1 == "-d" ]; then
+        name="$3"
+    fi
+    pods="$(lookuppod "$@")"
+    if [ -n "$pods" ]; then
+        echo "found $name"
+        echo "$pods"
+    else
+        missing=x
+        echo "no $name found"
+    fi
+}
+
+assurepods() {
+    $1
+    if [ -n "$missing" ]; then
+        $2
+    echo "waiting for pods"
+    while [ -n "$missing" ]; do
+        sleep 10
+        missing=
+        $1
+    done
+    fi
+}
+
+################################################################################
+# json manipulation
+################################################################################
+
+deljsonkey() {
+    local v
+    v="$(eval echo \"\${"$1"}\" | jq 'del(.'$2')')"
+    eval $1=\'"$v"\'
+}
+
+setjsonvalue() {
+    local value="$(echo "$3" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"
+    local v
+    v="$(eval echo \"\${"$1"}\" | jq '.'$2'="'"$value"'"')"
+    eval $1=\'"$v"\'
+}
+
+setjsonjson() {
+    local v
+    v="$(eval echo \"\${"$1"}\" | jq -s '.[0].'""$2""'=.[1] | .[0]' - <( echo "$3"))"
+    eval $1=\'"$v"\'
+}
+
+getjsonvalue() {
+    eval echo \"\$"$1"\" | jq -r '.'"$2 // empty"
+}
+
+getrequiredjsonvalue() {
+    local v
+    v="$(getjsonvalue "$@")"
+    if [ "$v" == null ]; then
+        fail "field $2 required in $1"
+    fi
+    echo "$v"
+}
+
+################################################################################
+# file lookup
+################################################################################
+
+lookupFileIn() {
+  local opt="-f"
+  if [ "$1" == "-d" ]; then
+    opt="-d"
+    shift
+  fi
+  local file="$1"
+  shift
+  for d in "$@"; do
+    if [ $opt "$d/$file" ]; then
+      echo "$d/$file"
+      return
+    fi
+  done
+}
+
+lookupFile() {
+  lookupFileIn "$@" "$GENDIR" "$CURRENT" "$ROOT" "$GARDEN"
+}
+
+################################################################################
+# manifest
+################################################################################
+
+# output:
+# name
+# namespace
+# kind
+# apiversion
+# objectkey
+# objectentry
+
+getManifestInfo()
+{
+  local manifest="$1"
+  local msg=""
+  if [ -n "$2" ]; then
+    msg="$2: "
+  fi
+
+  namespace=
+  getValue kind kind manifest
+  getValue apiversion apiVersion manifest
+  getValue name metadata.name manifest
+  getValue namespace metadata.namespace manifest
+
+  if [ -z "$name" ]; then
+    fail "$msg: name required for manifest"
+  fi
+  if [ -z "$kind" ]; then
+    fail "$msg: kind required for manifest"
+  fi
+  if [ -z "$apiversion" ]; then
+    fail "$msg: apiVersion required for manifest"
+  fi
+
+  objectkey="$(md5sum <<<"$name/$namespace/$kind/$apiversion" | cut -d' '  -f1)"
+  objectentry="{}"
+  setjsonvalue objectentry name "$name"
+  if [ -n "$namespace" ]; then
+    setjsonvalue objectentry namespace "$namespace"
+  fi
+  setjsonvalue objectentry kind "$kind"
+  setjsonvalue objectentry apiVersion "$apiversion"
+  if [ -n "$ord" ]; then
+    setjsonvalue objectentry index "$ord"
+  else
+    deljsonkey objectentry index
+  fi
+}
+
+getManifestInfoFromEntry()
+{
+  local v="${1:-objectentry}"
+  namespace=
+  kind=
+  name=
+  apiversion=
+  ord=
+  getValue kind kind $v
+  getValue apiversion apiVersion $v
+  getValue name name $v
+  getValue namespace namespace $v
+  getValue ord index $v
+
+  manifest="{}"
+
+  setjsonvalue manifest kind "$kind"
+  setjsonvalue manifest apiVersion "$apiversion"
+  setjsonvalue manifest metadata.name  "$name"
+
+  if [ -n "$namespace" ]; then
+    setjsonvalue manifest metadata.namespace "$namespace"
+  fi
+}
+
+getAPIServer()
+{
+  kubectl --kubeconfig "$1" config view --minify=true -o jsonpath='{.clusters[*].cluster.server}'
+}

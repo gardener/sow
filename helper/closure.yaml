@@ -1,0 +1,9 @@
+
+utilities:
+graph:
+components:
+products:
+
+closures: (( utilities.graph.evaluate(graph) ))
+cycles: (( utilities.graph.cycles(closures) ))
+order: (( utilities.graph.order(closures) ))
