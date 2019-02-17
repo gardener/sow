@@ -237,7 +237,7 @@ _CMD_delete()
   for c in "${order[@]}"; do
     if contains "$c" "${comps[@]}"; then
       echo "${nTOOL}ing $nCOMPONENT $c"
-      ACTION_execute deploy "$c" 
+      ACTION_execute delete "$c" 
     fi
   done
 }

@@ -1,0 +1,314 @@
+#!/usr/bin/env bash
+
+set -e
+
+source "$SOWLIB/utils"
+
+PLUGIN="$(dirname "${BASH_SOURCE[0]}")"
+
+field_path="${2:-kubectl}"
+dir="$GENDIR/$field_path"
+state="$STATEDIR/$field_path"
+manifestdir="$dir/manifests"
+mkdir -p "$dir" "$state" "$manifestdir"
+
+
+for h in "$PLUGIN/handlers"/*; do
+  if [ -h "$h" ]; then
+    source "$h"
+  fi
+done
+
+for h in "${@:3}"; do
+  echo "loading handler $h"
+  f="$(lookupFile "$h")"
+  if [ -n "$f" ]; then
+    source "$f"
+  else
+    fail "handler plugin '$j' not found"
+  fi
+done
+
+DEFKUBE=( )
+getValueOrJSON DEFKUBE "$field_path.kubeconfig" DEPLOYMENTJSON
+getJSONList MANIFESTS "$field_path.manifests" DEPLOYMENTJSON
+
+if [ ${#DEFKUBE[@]} -eq 0 ]; then
+  DEFKUBE=(value $KUBECONFIG)
+fi
+
+LEN="${#MANIFESTS[@]}"
+
+if [ $LEN -eq 0 ]; then
+  info no manifests found
+fi
+
+cmd_echo()
+{
+  echo "$@"
+}
+
+setKubeConfig()
+{
+  if [ $1 == value ]; then
+    local kubeconfig
+    if [[ "$2" != /* ]]; then
+      kubeconfig="$ROOT/$2"
+    else
+      kubeconfig="$2"
+    fi
+    cp "$kubeconfig" "$3"
+    echo "    using $kubeconfig"
+  else
+    echo "$2" > "$3"
+    echo "    using inline kubeconfig"
+  fi
+}
+
+# $1: action
+# $2: kubeconfig file
+# $3: manifest file
+exec_action()
+{
+  local name
+  local namespace
+  local kind
+  local apiversion
+  local objectkey
+  local objectentry
+
+  getManifestInfo "$(spiff merge --json "$3")"
+
+  local group="${apiversion%/*}"
+  if [ "$group" == "$apiversion" ]; then
+    group=core
+  fi
+  local f="action_${1}_${kind}_${group//\./_}"
+  if _is_function "$f"; then
+    $f "$name" "$namespace" "$2" "$3"
+  else
+    case "$1" in
+      deploy) exec_cmd kubectl --kubeconfig "$2" apply -f "$3";;
+      delete) exec_cmd kubectl --kubeconfig "$2" delete -f "$3";;
+    esac
+  fi
+}
+
+exec_manifest()
+{
+  local cmd="$1"
+  local type="$2"
+  local kube="$3"
+  local index="$4"
+  local manifest="$5"
+
+  local kubeconfig="$TMP_KUBECONFIG"
+  setKubeConfig "$type" "$kube" "$kubeconfig"
+  api="$(getAPIServer "$kubeconfig")"
+  ord="${#executed["$api"]}"
+
+  getManifestInfo "$manifest" "entry $index" "$ord"
+
+  local base
+  if [ -n "$namespace" ]; then
+    echo "manifest for $kind($apiversion): $namespace/$name"
+    base="$manifestdir/$index-$kind.$namespace.$name"
+  else
+    echo "manifest for $kind($apiversion): $name"
+    base="$manifestdir/$index-$kind.$name"
+  fi
+
+  local file="$base.yaml"
+
+  if [ "$cmd" == deploy ]; then
+    echo "$manifest" | spiff merge - >"$file"
+    exec_action "$cmd" "$kubeconfig" "$file"
+    setjsonvalue deployed 'clusters["'$api'"].kubeconfig' "$(cat "$kubeconfig")"
+    setjsonjson deployed 'clusters["'$api'"].manifests["'$objectkey'"]' "$objectentry"
+    executed["$api"]="${executed["$api"]} $objectkey"
+  else
+    if [ -f "$file" ]; then
+      exec_action "$cmd" "$kubeconfig" "$file"
+      deljsonkey deployed 'clusters["'$api'"].manifests["'$objectkey'"]'
+    fi
+  fi
+}
+
+TMP_KUBECONFIG="$dir/kubeconfig.tmp"
+TMP_MANIFEST="$dir/manifest.tmp"
+
+cleanup_deployments()
+{
+  local apis
+  local val
+  getJSON val "clusters" deployed
+  if [ -z "$val" ]; then
+    return
+  fi
+  getKeys apis "clusters" deployed
+  for api in "${apis[@]}"; do
+    local keys
+    getKeys keys 'clusters["'"$api"'"].manifests' deployed
+    local kubeconfig
+    local cur=( ${executed[$api]} )
+    getValue kubeconfig 'clusters["'"$api"'"].kubeconfig' deployed
+    echo "$kubeconfig" >"$TMP_KUBECONFIG"
+    echo "cluster $api"
+    echo "  found deployed objects: ${#keys[@]}"
+    echo "  found currect objects: ${#cur[@]}"
+    declare -A obsolete ords names
+    local ordered=( )
+
+    for key in "${keys[@]}"; do
+      if ! contains "$key" "${cur[@]}"; then
+        local objectentry
+        getJSON objectentry 'clusters["'"$api"'"].manifests["'"$key"'"]' deployed
+        getManifestInfoFromEntry
+
+        if [ -n "$namespace" ]; then
+          names[$key]="$kind($apiversion): $namespace/$name"
+        else
+          names[$key]="$kind($apiversion): $name"
+        fi
+
+        if [ -z "$ord" ]; then
+          ord=0
+        fi
+        obsolete[$key]="$manifest"
+        ords[$key]="$ord"
+        local new=( )
+        local found=
+        for k in "${ordered[@]}"; do
+          if [ -z "$found" -a ${ords[$k]} -lt $ord ]; then
+            new=( "${new[@]}" "$key" )
+            found=X
+          fi
+          new=( "${new[@]}" "$k" )
+        done
+        if [ -z "$found" ]; then
+          ordered=( "${new[@]}" "$key" )
+        else
+          ordered=( "${new[@]}" )
+        fi
+      fi
+    done
+
+    if [ ${#ordered[@]} -gt 0 ]; then
+      echo "  found deployed obsolete objects: ${#ordered[@]}"
+      for key in "${ordered[@]}"; do
+        echo "${obsolete[$key]}" > "$TMP_MANIFEST"
+        echo "    ${names[$key]}"
+        exec_action delete  "$TMP_KUBECONFIG" "$TMP_MANIFEST"
+        deljsonkey deployed 'clusters["'"$api"'"].manifests["'"$key"'"]'
+      done
+    fi
+    getKeys keys 'clusters["'"$api"'"].manifests' deployed
+    if [ ${#keys[@]} -eq 0 ]; then
+      deljsonkey deployed 'clusters["'"$api"'"]'
+    fi
+  done
+}
+
+save()
+{
+  if [ -n "$deployed" ]; then
+    if [ -z "$DRYRUN" ]; then
+      if [ -f "$state/deployed.json" ]; then
+        mv "$state/deployed.json" "$state/deployed.json.bak"
+      fi
+      echo "$deployed" > "$state/deployed.json"
+      deployed=""
+    fi
+  fi
+  rm -f "$TMP_KUBECONFIG" "$TMP_MANIFEST"
+}
+
+execute_manifest()
+{
+  exec_manifest $1 "${kube[@]}" "$i-$2" "$3"
+}
+
+execute_file()
+{
+  local j="$2"
+  local f="$3"
+  local file
+
+  file="$(lookupFile "$f")"
+  if [ -z "$file" ]; then
+    fail "entry $i:$j: $f not found"
+  fi
+  while IFS= read -r line; do
+    exec_manifest $1 "${kube[@]}" "$i-$j" "$line"
+  done < <(spiff merge --json "$file" | $order)
+}
+
+execute_entry()
+{
+  local i=$2
+  local entry="$3"
+  local nested
+
+  getValueOrJSON kube kubeconfig entry
+  if [ ${#kube[@]} -eq 0 ]; then
+    kube=( "${DEFKUBE[@]}" )
+  else
+    nested=X
+  fi
+
+  getJSONList manifests manifests entry
+  if [ ${#manifests[@]} -ne 0 ]; then
+    executionLoop "$1" manifests execute_manifest
+  else
+    getValueList files files entry
+    getValueList args command entry
+    if [ ${#files[@]} -ne 0 ]; then
+      if [ ${#args[@]} -ne 0 ]; then
+        fail "entry $i: only files or command possible"
+      fi
+      executionLoop "$1" files execute_file
+    elif [ ${#args[@]} -ne 0 ]; then
+      echo "command: ${#args[@]}: ${args[@]}"
+      if _is_function "cmd_${args[0]}"; then
+         "cmd_${args[0]}" "$1" "${args[@]:1}"
+      else
+        fail "entry $i: command ${args[0]} not supported by kubectl plugin"
+      fi
+    elif [ -z "$nested" ]; then
+        exec_manifest $1 "${kube[@]}" "$i" "$entry"
+    else
+      getJSON tmpf files entry
+      getJSON tmpc command entry
+      if [ -z "$tmpf$tmpc" ]; then
+        fail "entry $i: kubeconfig option must be combined with manifest or command option"
+      fi
+    fi
+  fi
+}
+
+execute()
+{
+  trap save EXIT ERR 2
+  declare -A executed
+  deployed="{}"
+  if [ -f "$state/deployed.json" ]; then
+    deployed="$(cat "$state/deployed.json")"
+  fi
+  executionLoop "$1" MANIFESTS execute_entry a
+  cleanup_deployments
+  save
+}
+
+deploy() {
+  execute deploy "$@"
+}
+
+delete() {
+  execute delete "$@"
+}
+
+case "$1" in
+    deploy) deploy "${@:1}";;
+    delete) delete "${@:1}";;
+    *) fail "unsupported action $1"
+esac

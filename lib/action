@@ -126,7 +126,7 @@ ACTION_execute()
               if [ ! -f "$EXPORT/$imp/export.yaml" ]; then
                   fail "imported $nCOMPONENT $imp not deployed yet"
               fi
-              setjsonjson imports "imports.$(echo "$a")" "$(cat "$EXPORT/$imp/export.yaml" | spiff merge --json -)"
+              setjsonjson imports "imports.$(echo "$a")" "$(cat "$EXPORT/$imp/export.yaml" | spiff merge --json - || fail "processing imports")"
           fi
       done
       echo "$imports" | jq . > "$GENDIR/import.json"
@@ -174,13 +174,13 @@ ACTION_execute()
       else
           deploymentstubs=("$CURRENT/$fACTIONDEF" "${stubs[@]}" "$CONFIG" "$GENDIR/import.json")
       fi
-      deployment="$(spiff merge --json "${deploymentstubs[@]}")"
+      deployment="$(spiff merge --json "${deploymentstubs[@]}" || fail "processing $fACTIONDEF")"
   fi
   if [ -z "$deployment" ]; then
     deployment="{}"
   fi
   export DEPLOYMENTJSON="$deployment"
-  spiff merge - <<<"$deployment" > "$GENDIR/$fACTIONDEF"
+  spiff merge - <<<"$deployment" > "$GENDIR/$fACTIONDEF" || fail "saving $nACTIONDEF"
 
   case "$action" in
       (deploy) _deploy "$@";;
@@ -197,16 +197,16 @@ handle_exports()
 {
   if [ "$CMD" != "delete" -a -f "$CURRENT/export.yaml" ]; then
       if [ -f "$STATEDIR/state.yaml" ]; then
-          spiff merge "$CURRENT/export.yaml" "${deploymentstubs[@]}" "$STATEDIR/state.yaml" > "$EXPORTDIR/export.yaml"
+          spiff merge "$CURRENT/export.yaml" "${deploymentstubs[@]}" "$STATEDIR/state.yaml" > "$EXPORTDIR/export.yaml" || fail "processing exports"
       else
           if [ -n "$DEPLOYMENTJSON" ]; then
-              echo "$DEPLOYMENTJSON" | spiff merge "$CURRENT/export.yaml" - > "$EXPORTDIR/export.yaml"
+              echo "$DEPLOYMENTJSON" | spiff merge "$CURRENT/export.yaml" - > "$EXPORTDIR/export.yaml" || fail "processing exports"
           else
-              spiff merge "$CURRENT/export.yaml" > "$EXPORTDIR/export.yaml"
+              spiff merge "$CURRENT/export.yaml" > "$EXPORTDIR/export.yaml" || fail "processing exports"
           fi
       fi
 
-      EXPORTJSON="$(spiff merge --json "$EXPORTDIR/export.yaml")"
+      EXPORTJSON="$(spiff merge --json "$EXPORTDIR/export.yaml" || fail "reading exports")"
       _jq_get_value '(.files // empty) | keys[]' <<<"$EXPORTJSON" | while IFS= read -r line; do
         getValue  p "files.$line.path" EXPORTJSON
         if [ -z "$p" ]; then

@@ -1,0 +1,57 @@
+#!/bin/bash
+
+set -e
+
+source "$SOWLIB/utils"
+
+field_path="${2:-git}"
+dir="$GENDIR/$field_path"
+state="$STATEDIR/$field_path"
+mkdir -p "$dir" "$state"
+
+getRequiredValue repo "$field_path.repo" DEPLOYMENTJSON
+getValue tag "$field_path.tag" DEPLOYMENTJSON
+getValue branch "$field_path.branch" DEPLOYMENTJSON
+getValueList files "$field_path.files" DEPLOYMENTJSON
+
+if [ -z "$tag$branch" ]; then
+    fail "either 'tag' or 'branch' attribute is required for field $1"
+fi
+if [ -n "$tag" ]; then
+    if [ -n "$branch" ]; then
+        fail "only 'tag' or 'branch' attribute should be given for field $1"
+    fi
+    # tag is given
+    prefix="refs/tags/"
+    ref="$tag"
+else
+    # branch is given
+    prefix=
+    ref="$branch"
+fi
+
+repo_path="$dir/repo"
+
+deploy() {
+    info "Cloning repo $repo ..."
+
+    if [ ! -d "$repo_path" ]; then
+        git clone --depth 1 --no-checkout --branch $ref "$repo" "$repo_path"
+    fi
+    (
+        cd "$repo_path"
+        git fetch --depth 1 -f origin $prefix$ref
+        git reset $ref 1> /dev/null
+        git checkout $ref "${files[@]}"
+    )
+}
+
+delete() {
+    true
+}
+
+case "$1" in
+    deploy) deploy "$@";;
+    delete) delete "$@";;
+    *) fail "unsupported action $1"
+esac

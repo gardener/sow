@@ -1,0 +1,75 @@
+#!/bin/bash -e
+
+source "$SOWLIB/utils"
+
+field_path="${2:-helm}"
+command="${3:-"upgrade"}"
+dir="$GENDIR/$field_path"
+state="$STATEDIR/$field_path"
+mkdir -p "$dir" "$state"
+
+jq ."$field_path".values <<< "$DEPLOYMENTJSON" > "$dir/values.json"
+
+getRequiredValue "source" "$field_path.source" DEPLOYMENTJSON
+getRequiredValue name "$field_path.name" DEPLOYMENTJSON
+getRequiredValue namespace "$field_path.namespace" DEPLOYMENTJSON
+getValueList helm_flags_deploy "$field_path.flags.deploy" DEPLOYMENTJSON
+getValueList helm_flags_delete "$field_path.flags.delete" DEPLOYMENTJSON
+
+# Writes from stdin to file
+dump() {
+    if [ -z ${1:-""} ]; then
+        fail "dump: no path given!"
+    fi
+    cat > "$1"
+}
+
+src="$(lookupFile -d "$source")"
+if [ -z "$src" ]; then
+    if [ -f "$source" ]; then
+        src="$source"
+    else
+        fail "helm source $source not found"
+    fi
+fi
+
+case "$command" in
+    ("upgrade")
+        flags="--install --force --wait"
+        pipe_cmd="cat"
+        ;;
+    ("template")
+        render_path=""
+        flags="--name"
+        pipe_cmd="dump $dir/rendered_charts.yaml"
+        ;;
+    (*)
+        fail "Unknown command for helm: '$command'"
+        ;;
+esac
+
+deploy() {
+    info "Running helm $command for $name ..."
+    exec_cmd helm $command $flags $name \
+        --values "$dir/values.json" \
+        --namespace $namespace \
+        $(echo "${helm_flags_deploy[@]}") \
+        "$src" \
+        | $pipe_cmd
+}
+
+delete() {
+    if [ "$command" = "upgrade" ]; then
+        info "Deleting helm deployment for $name"
+        exec_cmd helm delete \
+            --purge \
+            $name \
+            $(echo "${helm_flags_delete[@]}")
+    fi
+}
+
+case "$1" in
+    deploy) deploy "$@";;
+    delete) delete "$@";;
+    *) fail "unsupported action $1"
+esac

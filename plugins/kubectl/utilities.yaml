@@ -1,0 +1,11 @@
+utilities:
+  <<: (( &temporary(merge || ~) ))
+  kubectl:
+     templates:
+       kubectl:
+         <<: (( &template ))
+         kubeconfig: (( config ))
+         manifests: (( read(file, "importmulti") ))
+         values: (( &temporary(settings) ))
+
+     generate: (( lambda |file,config,settings|->*utilities.kubectl.templates.kubectl ))
