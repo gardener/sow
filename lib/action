@@ -7,7 +7,7 @@ ACTION_setup()
     fail "unknoen $nCOMPONENT $1"
   fi
   COMPONENT="$1"
- 
+
   local comp
   getComponentMeta comp "$1"
   getComponentMetaProduct PRODUCT comp
@@ -47,9 +47,9 @@ ACTION_execute()
   export KUBECONFIG
   export DOMAIN
 
-  if [ -x "$CURRENT/lib/action" ]; then
+  if [ -x "$CURRENT/action" ]; then
     echo "using local action sctipt"
-    source "$CURRENT/lib/action"
+    source "$CURRENT/action"
   fi
 
   ####################
@@ -187,7 +187,7 @@ ACTION_execute()
       (delete) _delete "$@";;
       (*) fail "unknown command $action";;
   esac
-  
+
   handle_state
   handle_exports
   )

@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+source "$SOWLIB/utils"
+source "$SOWLIB/k8s"
+field_path="${2:-tiller}"
+
+helminit() {
+    helm init --service-account=tiller
+}
+
+K8S_setKubeConfig "$field_path"
+
+case $1 in
+deploy) K8S_assurepods "K8S_checkpod -d kube-system tiller-deploy" "helminit";;
+delete) kubectl -n kube-system delete deployment tiller-deploy || true;;
+*) fail "unsupported command $1";;
+esac
+
