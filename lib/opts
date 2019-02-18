@@ -119,13 +119,13 @@ _check_opt()
     if [ "$n" == "$s" ]; then
       # no arg expected
       if [ "$1" != "$k" ]; then
-        Error "no argument expected for option '$k'"
+        fail "no argument expected for option '$k'"
       fi
     else
       if [ "$1" == "$k" ]; then
         # no value in option string
         if [ $# -le 2 ]; then
-          Error "argument expected for option '$k'"
+          fail "argument expected for option '$k'"
         fi
         v="$3"
         (( _cnt++ ))
@@ -137,7 +137,7 @@ _check_opt()
     debug "$2['$k']='$v'"
     eval "$2['$k']='$v'"
   else 
-    Error "invalid option '$k'"
+    fail "invalid option '$k'"
   fi
 }
 

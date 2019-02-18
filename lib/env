@@ -10,17 +10,10 @@ set -eo pipefail
 
 MAINPRODUCT="<main>"
 
-nTOOL=sow
-nLANDSCAPE=acre
-fCONFIG=acre.yaml          # acre
-dCOMPONENTS=components  # species
-nCOMPONENT=species         # species
-nCOMPONENTS=species        # species
-fCOMPDEF=component.yaml    # species.yaml
-fACTIONDEF=deployment.yaml # guide.yaml
-dROOTPRODUCT=garden     # crop
-nPRODUCT=greenhouse           # nursery
-dPRODUCTS=greenhouses        # nurseries
+#echo "loading terms $CFG_TERMS"
+#echo "loading struct $CFG_LAYOUT"
+source "$SOW/layout/struct/$CFG_LAYOUT"
+source "$SOW/layout/terms/$CFG_TERMS"
 
 determineCurrent()
 {(
@@ -99,6 +92,8 @@ getImports()
 {
   _get_labeled_value_list $1 .component.imports <<<"${!2}"
 }
+
+
 
 ROOT="$(determineRoot)"
 export ROOT

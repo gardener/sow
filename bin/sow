@@ -34,6 +34,24 @@ help()
 
 source "$SOWLIB/utils"
 source "$SOWLIB/meta"
+source "$SOWLIB/opts"
+
+declare -A opts
+declare -A params
+params=( [a]=all [A]=All [v]=verbose [version]="" [dryrun]="" [x]=trace [D]=debug [p]="=$nPRODUCT" [terms]="=" [layout]="=" )
+OPT_parse_options params opts "$@"
+shift $(( _cnt - 1 ))
+
+CFG_LAYOUT=garden
+CFG_TERMS=garden
+
+if [ -n "${opts[layout]}" ]; then
+  CFG_LAYOUT="${opts[layout]}"
+  CFG_TERMS=$CFG_LAYOUT
+fi
+if [ -n "${opts[terms]}" ]; then
+  CFG_TERMS="${opts[terms]}"
+fi
 
 case "$1" in
   version) get_version
@@ -43,7 +61,6 @@ case "$1" in
 esac
 
 source "$SOWLIB/env"
-source "$SOWLIB/opts"
 source "$SOWLIB/cmd"
 source "$SOWLIB/action"
 
@@ -467,11 +484,6 @@ EOF
 # main
 ###########################################################################
 
-declare -A opts
-declare -A params
-params=( [a]=all [A]=All [v]=verbose [version]="" [dryrun]="" [x]=trace [D]=debug [p]="=$nPRODUCT" )
-OPT_parse_options params opts "$@"
-shift $(( _cnt - 1 ))
 
 if [ ${opts[version]+set} ]; then
   get_version

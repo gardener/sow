@@ -61,3 +61,15 @@ It can again be versioned using a versioning system.
 With git, for example, the installation source can be
 added and versioned by a git submodule.
 
+### The Wording
+
+_Sow_ is not meant as noun, but verb, in the sense of the
+required action to till the soil. It is used to _sow_ the
+seedlings of different kinds or _species_ found in
+_greenhouses_ in the field, or _acre_.
+
+The first use case is to install a garden with a
+[gardener](https://github.com/gardener/gardener) on
+a kubernetes cluster.
+
+

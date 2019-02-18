@@ -1,0 +1,7 @@
+
+fCONFIG=acre.yaml
+dCOMPONENTS=components
+fCOMPDEF=component.yaml
+fACTIONDEF=deployment.yaml
+dROOTPRODUCT=garden
+dPRODUCTS=greenhouses

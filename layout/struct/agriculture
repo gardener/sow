@@ -1,0 +1,7 @@
+
+fCONFIG=acre.yaml
+dCOMPONENTS=species
+fCOMPDEF=species.yaml
+fACTIONDEF=guide.yaml
+dROOTPRODUCT=crop 
+dPRODUCTS=greenhouses

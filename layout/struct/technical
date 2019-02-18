@@ -1,0 +1,7 @@
+
+fCONFIG=landscape.yaml
+dCOMPONENTS=components
+fCOMPDEF=component.yaml
+fACTIONDEF=deployment.yaml
+dROOTPRODUCT=product
+dPRODUCTS=products
