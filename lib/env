@@ -89,7 +89,7 @@ determineRoot()
 
 getComponentJSON()
 {
-  COMPONENTJSON="$(spiff merge --json "$1" "$CONFIG")"
+  COMPONENTJSON="$(spiff merge --json "$1" "$SOWLIB/templates/component.yaml" "$CONFIG")"
   if [ -z "$COMPONENTJSON" ]; then
     COMPONENTJSON="{}"
   fi

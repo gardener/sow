@@ -495,3 +495,7 @@ getAPIServer()
 {
   kubectl --kubeconfig "$1" config view --minify=true -o jsonpath='{.clusters[*].cluster.server}'
 }
+
+if [ -n "$TRACE" ]; then
+  set -x
+fi

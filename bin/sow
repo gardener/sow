@@ -56,12 +56,12 @@ setupProductMeta()
   rel="${1#$ROOT/}"
   product="${2:-${1##*/}}"
   if [ -n "${PRODUCTS["$product"]}" ]; then
-    fail "product $product ($rel) defined twice; ${PRODUCTS["$product"]}"
+    fail "$nPRODUCT $product ($rel) defined twice; ${PRODUCTS["$product"]}"
   fi
   PRODUCTS["$product"]="$rel"
   setjsonvalue METAJSON "products[\"$product\"].dir" "$rel"
 
-  verbose "found product $product: $rel"
+  verbose "found $nPRODUCT $product: $rel"
   while IFS= read -r line; do
     setupComponentMeta "$line"
   done < <(find "$1/$dCOMPONENTS" -name $fCOMPDEF)
@@ -105,6 +105,50 @@ setupComponentMeta()
     fi
     (( cnt+=1 ))
   done
+}
+
+setupLandscape()
+{
+  declare -Ag PRODUCTS COMPONENTS
+  METAJSON="{}"
+
+  setupProductMeta "$ROOTPRODUCTDIR" "$MAINPRODUCT"
+
+  METAJSON="$(spiff merge --json "$SOW/helper/closure.yaml" - "$SOWLIB/templates/graph.yaml" <<<"$METAJSON")"
+  echo "$METAJSON" | jq .>"$META"
+
+  cycles=( )
+  getJSONList cycles cycles METAJSON
+
+  FAILED=
+  if [ ${#cycles[@]} -ne 0 ]; then
+     info "found dependency cycles:"
+     for c in "${cycles[@]}"; do
+       cycle=( )
+       getValueList cycle "" c
+       echo "--> ${cycle[@]}"
+     done
+     FAILED=X
+  fi
+
+  msg="found missing dependencies:"
+  for c in "${!COMPONENTS[@]}"; do
+    missing=( )
+    getValueList missing "closures[\"$c\"].missing" METAJSON
+    if [ ${#missing[@]} -ne 0 ]; then
+      if [ -n "$msg" ]; then
+        echo "$msg"
+        msg=
+      fi
+      echo "--> $c: ${missing[@]}"
+      FAILED=X
+    fi
+  done
+
+  if [ -n "$FAILED" ]; then
+    fail "aborted due to dependency problems"
+  fi
+
 }
 
 ###########################################################################
@@ -159,6 +203,28 @@ showComponent()
   for i in "${order[@]}"; do
     info "     - $i"
   done
+  ( # should be part of the landscape meta data, later on
+    CURRENT="$ROOT/${COMPONENTS[$c]}"
+    setComponent "$CURRENT"
+    getComponentJSON "$CURRENT/$fCOMPDEF"
+    PRODUCTDIR="$productdir"
+
+    declare -a slist
+    # evaluate additional stubs
+    _get_value_list slist stubs COMPONENTJSON
+    if [ ${#slist[@]} -ne 0 ]; then
+      info "     configured deployment stubs:"
+      for i in "${slist[@]}"; do
+        local stub
+        stub="$(lookupStub "$i")"
+        if [ -z "$stub" ]; then
+          info "     - $i (not found)"
+        else
+          info "     - $i (${stub#$ROOT/})"
+        fi
+      done
+    fi
+  )
 }
 
 CMD_help()
@@ -437,10 +503,6 @@ export VERBOSE
 CMDS=( deploy delete info show help version add )
 cmd="$(CMDS_resolve_shortcut "$1" "${CMDS[@]}")"
 
-if [ ${opts[trace]+set} ]; then
-  set -x
-fi
-
 verbose "$nLANDSCAPE = $ROOT"
 verbose "$nLANDSCAPE $nPRODUCT = $ROOTPRODUCTDIR"
 if [ -n "$PRODUCT" ]; then
@@ -451,46 +513,14 @@ if [ -n "$PRODUCT" ]; then
   fi
 fi
 
-declare -A PRODUCTS COMPONENTS
-METAJSON="{}"
-
-setupProductMeta "$ROOTPRODUCTDIR" "$MAINPRODUCT"
-
-METAJSON="$(spiff merge --json "$SOW/helper/closure.yaml" - "$SOWLIB/templates/graph.yaml" <<<"$METAJSON" || fail "parsing meta JSON")"
-echo "$METAJSON" | jq .>"$META"
-
-cycles=( )
-getJSONList cycles cycles METAJSON
-
-FAILED=
-if [ ${#cycles[@]} -ne 0 ]; then
-   info "found dependency cycles:"
-   for c in "${cycles[@]}"; do
-     cycle=( )
-     getValueList cycle "" c
-     echo "--> ${cycle[@]}"
-   done
-   FAILED=X
+TRACE=
+if [ ${opts[trace]+set} ]; then 
+  TRACE=X
+  set -x
 fi
+export TRACE
 
-msg="found missing dependencies:"
-for c in "${!COMPONENTS[@]}"; do
-  missing=( )
-  getValueList missing "closures[\"$c\"].missing" METAJSON
-  if [ ${#missing[@]} -ne 0 ]; then
-    if [ -n "$msg" ]; then
-      echo "$msg"
-      msg=
-    fi
-    echo "--> $c: ${missing[@]}"
-    FAILED=X
-  fi
-done
-
-if [ -n "$FAILED" ]; then
-  fail "aborted due to dependency problems"
-fi
-
+setupLandscape
 
 CMDS_execute_command --invalid=handle_action_command "$cmd" CMD_ "${CMDS[*]}" "${@:2}"
 

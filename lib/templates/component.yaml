@@ -1,0 +1,10 @@
+
+
+landscape: (( &template ))
+
+utilities:
+  <<: (( &inject &temporary(merge || ~) ))
+
+  components:
+    isEnabled: (( |c|-> contains(_.landscape.activate || [],c) ))
+
