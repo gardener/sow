@@ -2,10 +2,17 @@
 
 K8S_setKubeConfig()
 {
-  local target="$GENDIR/${2:-kubeconfig}"
+  local target="$GENDIR/kubeconfig"
+  if [ -n "$2" ]; then
+    if [[ "$2" = /* ]]; then
+        target="$2"
+    else
+        target="$GENDIR/$2"
+    fi
+  fi
   getValueOrJSON DEFKUBE "$1.kubeconfig" DEPLOYMENTJSON
   if [ ${#DEFKUBE[@]} -eq 0 ]; then
-    fail "no kubeconfig configured"
+    fail "no kubeconfig configured for $1"
   fi
   if [ ${DEFKUBE[0]} == value ]; then
     local kubeconfig

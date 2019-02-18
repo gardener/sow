@@ -456,7 +456,7 @@ METAJSON="{}"
 
 setupProductMeta "$ROOTPRODUCTDIR" "$MAINPRODUCT"
 
-METAJSON="$(spiff merge --json "$SOW/helper/closure.yaml" - "$SOWLIB/templates/graph.yaml" <<<"$METAJSON")"
+METAJSON="$(spiff merge --json "$SOW/helper/closure.yaml" - "$SOWLIB/templates/graph.yaml" <<<"$METAJSON" || fail "parsing meta JSON")"
 echo "$METAJSON" | jq .>"$META"
 
 cycles=( )

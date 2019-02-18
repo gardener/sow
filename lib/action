@@ -132,7 +132,7 @@ ACTION_execute()
       echo "$imports" | jq . > "$GENDIR/import.json"
 
       # evaluate additional stubs
-      _get_value_list slist stubs COMPONENTJSON
+      _get_value_list slist component.stubs COMPONENTJSON
       for i in "${slist[@]}"; do
         local stub
         stub="$(lookupStub "$i")"
@@ -179,6 +179,7 @@ ACTION_execute()
   if [ -z "$deployment" ]; then
     deployment="{}"
   fi
+
   export DEPLOYMENTJSON="$deployment"
   spiff merge - <<<"$deployment" > "$GENDIR/$fACTIONDEF" || fail "saving $nACTIONDEF"
 

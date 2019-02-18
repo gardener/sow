@@ -14,7 +14,7 @@ fail() {
 error() {
     echo "$@">&2
 }
- 
+
 info () {
     echo "$@"
 }
@@ -342,48 +342,6 @@ getJSONList() {
 }
 
 ################################################################################
-# pod utilities
-################################################################################
-
-lookuppod() {
-    # Doesn't work out of the box with jq on CoreOS
-    ext=
-    if [ "$1" == -d ]; then
-        shift
-        ext="-[a-z0-9]{9}"
-    fi
-    kubectl -n $1 get pods | (egrep "$2$ext-[a-z0-9]{5} " || true) | (grep Running || true)
-}
-
-checkpod() {
-    name="$2"
-    if [ $1 == "-d" ]; then
-        name="$3"
-    fi
-    pods="$(lookuppod "$@")"
-    if [ -n "$pods" ]; then
-        echo "found $name"
-        echo "$pods"
-    else
-        missing=x
-        echo "no $name found"
-    fi
-}
-
-assurepods() {
-    $1
-    if [ -n "$missing" ]; then
-        $2
-    echo "waiting for pods"
-    while [ -n "$missing" ]; do
-        sleep 10
-        missing=
-        $1
-    done
-    fi
-}
-
-################################################################################
 # json manipulation
 ################################################################################
 
@@ -433,12 +391,16 @@ lookupFileIn() {
   esac
   local file="$1"
   shift
-  for d in "$@"; do
-    if [ $opt "$d/$file" ]; then
-      echo "$d/$file"
-      return
-    fi
-  done
+  if [[ "$DIR" = /* ]]; then
+    echo "$file"
+  else
+    for d in "$@"; do
+      if [ $opt "$d/$file" ]; then
+        echo "$d/$file"
+        return
+      fi
+    done
+  fi
 }
 
 lookupFile() {

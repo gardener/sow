@@ -1,13 +1,6 @@
 #!/bin/bash
 
-set -e
-
-source "$SOWLIB/utils"
-
-field_path="${2:-git}"
-dir="$GENDIR/$field_path"
-state="$STATEDIR/$field_path"
-mkdir -p "$dir" "$state"
+source "$SOWLIB/pluginutils"
 
 getRequiredValue repo "$field_path.repo" DEPLOYMENTJSON
 getValue tag "$field_path.tag" DEPLOYMENTJSON

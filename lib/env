@@ -19,8 +19,8 @@ nCOMPONENTS=species        # species
 fCOMPDEF=component.yaml    # species.yaml
 fACTIONDEF=deployment.yaml # guide.yaml
 dROOTPRODUCT=garden     # crop
-nPRODUCT=nursery           # nursery
-dPRODUCTS=nurseries        # nurseries
+nPRODUCT=greenhouse           # nursery
+dPRODUCTS=greenhouses        # nurseries
 
 determineCurrent()
 {(
@@ -118,7 +118,7 @@ if [ -n "$CURRENT" ]; then
     PRODUCT="$product"
     COMPONENT="$component"
   fi
-else 
+else
   PRODUCTDIR="$(getProductDir "$(pwd)")"
   if [ -n "$PRODUCTDIR" ]; then
     PRODUCT="$(getProductForDir "$PRODUCTDIR")"

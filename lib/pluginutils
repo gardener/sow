@@ -1,0 +1,8 @@
+source "$SOWLIB/utils"
+
+plugin="$(cd "$(dirname "${BASH_SOURCE[1]}")"; basename "$(pwd)")"
+field_path="${2:-$plugin}"
+
+dir="$GENDIR/$field_path"
+state="$STATEDIR/$field_path"
+mkdir -p "$dir" "$state"

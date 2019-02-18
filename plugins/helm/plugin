@@ -1,12 +1,11 @@
 #!/bin/bash -e
 
-source "$SOWLIB/utils"
+source "$SOWLIB/pluginutils"
+source "$SOWLIB/k8s"
 
-field_path="${2:-helm}"
 command="${3:-"upgrade"}"
-dir="$GENDIR/$field_path"
-state="$STATEDIR/$field_path"
-mkdir -p "$dir" "$state"
+
+K8S_setKubeConfig "$field_path" "$dir/kubeconfig"
 
 jq ."$field_path".values <<< "$DEPLOYMENTJSON" > "$dir/values.json"
 

@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 
-source "$SOWLIB/utils"
+source "$SOWLIB/pluginutils"
 source "$SOWLIB/k8s"
-field_path="${2:-tiller}"
 
 helminit() {
     helm init --service-account=tiller
 }
 
-K8S_setKubeConfig "$field_path"
+K8S_setKubeConfig "$field_path" "$dir/kubeconfig"
 
 case $1 in
 deploy) K8S_assurepods "K8S_checkpod -d kube-system tiller-deploy" "helminit";;

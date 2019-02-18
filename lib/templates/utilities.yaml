@@ -10,3 +10,5 @@ utilities:
   joinlists: (( lambda |lists|->sum[lists|[]|s,l|-> s l] ))
 
   svcHosts: (( lambda |svc,ns|->($x=[svc, ns, "svc", "cluster", "local"]) sum[x|[]|s,i,v|-> s join(".",x.[0..i])]  ))
+
+  secretdata: (( |data|->sum[data|{}|s,k,v|->s {k=base64(v)}] ))
