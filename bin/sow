@@ -6,8 +6,43 @@ VERSION=0.1
 SOW="$(cd "$(dirname "${BASH_SOURCE[0]}")/.."; echo "$PWD" )"
 SOWLIB="$SOW/lib"
 
+get_version()
+{
+  echo "$nTOOL version $VERSION"
+}
+
+help()
+{
+  echo "$nTOOL - a tiny installer framework based on components and plugins"
+  echo
+  echo "$nTOOL [<options>] [<command>]"
+  echo
+  echo "options:"
+  echo "  -a         complete the $nCOMPONENT set"
+  echo "  -A         use all $nCOMPONENTS if no one is specified"
+  echo "  -v         verbose mode"
+  echo "  -t         trace mode"
+  echo "  -D         debug mode"
+  echo "  --version  show version"
+  echo
+  echo "commands:"
+  echo "  info                    show info about current location"
+  echo "  show {<components>}     show info about components"
+  echo "  deploy {<components>}   deploy components"
+  echo "  delete {<components>}   delete deployment of components"
+  echo "  add {<components>}      create a frame for a new component"
+}
+
 source "$SOWLIB/utils"
 source "$SOWLIB/meta"
+
+case "$1" in
+  version) get_version
+           exit 0;;
+  help) help
+        exit 0;;
+esac
+
 source "$SOWLIB/env"
 source "$SOWLIB/opts"
 source "$SOWLIB/cmd"
@@ -77,11 +112,6 @@ setupComponentMeta()
 # commands
 ###########################################################################
 
-get_version()
-{
-  echo "$nTOOL version $VERSION"
-}
-
 # missing command handler
 # $1: prefix of missing command function
 # $2: command name
@@ -95,27 +125,7 @@ handle_action_command()
   fi
 }
 
-help()
-{
-  echo "$nTOOL - a tiny installer framework based on components and plugins"
-  echo
-  echo "$nTOOL [<options>] [<command>]"
-  echo 
-  echo "options:"
-  echo "  -a         complete the $nCOMPONENT set"
-  echo "  -A         use all $nCOMPONENTS if no one is specified"
-  echo "  -v         verbose mode"
-  echo "  -t         trace mode"
-  echo "  -D         debug mode"
-  echo "  --version  show version"
-  echo
-  echo "commands:"
-  echo "  info                    show info about current location"
-  echo "  show {<components>}     show info about components"
-  echo "  deploy {<components>}   deploy components"
-  echo "  delete {<components>}   delete deployment of components"
-  echo "  add {<components>}      create a frame for a new component"
-}
+
 
 showComponent()
 {
@@ -181,7 +191,7 @@ CMD_info()
     for c in "${!COMPONENTS[@]}"; do
       showComponent "$c"
     done
-    echo 
+    echo
     order=( )
     getValueList order order METAJSON
     info "$nTOOL order: ${order[@]}"
@@ -198,7 +208,7 @@ CMD_info()
 
 
 CMD_show()
-{ 
+{
   execClosure _CMD_show "$@"
 }
 
@@ -230,7 +240,7 @@ _CMD_deploy()
   for c in "${order[@]}"; do
     if contains "$c" "${comps[@]}"; then
       echo "${nTOOL}ing $nCOMPONENT $c"
-      ACTION_execute deploy "$c" 
+      ACTION_execute deploy "$c"
     fi
   done
 }
@@ -250,7 +260,7 @@ _CMD_delete()
   for c in "${order[@]}"; do
     if contains "$c" "${comps[@]}"; then
       echo "${nTOOL}ing $nCOMPONENT $c"
-      ACTION_execute delete "$c" 
+      ACTION_execute delete "$c"
     fi
   done
 }
@@ -302,7 +312,7 @@ execClosure()
      comps=( "${tmp[@]}" )
   fi
 
-  $cmd "${comps[@]}" 
+  $cmd "${comps[@]}"
 }
 
 
@@ -349,7 +359,7 @@ CMD_add()
     if [ -d "$COMPDIR" ]; then
         fail "folder for $nCOMPONENT $c already exists"
     fi
-    
+
     info "creating $nCOMPONENT $c in $nPRODUCT $product"
 
     mkdir -p "$COMPDIR/lib"
@@ -428,11 +438,7 @@ export VERBOSE
 CMDS=( deploy delete info show help version add )
 cmd="$(CMDS_resolve_shortcut "$1" "${CMDS[@]}")"
 
-if [ "$cmd" == version -o "$cmd" == help ]; then
-  CMD_$cmd
-fi
-
-if [ ${opts[trace]+set} ]; then 
+if [ ${opts[trace]+set} ]; then
   set -x
 fi
 
