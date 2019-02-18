@@ -110,10 +110,11 @@ help()
   echo "  --version  show version"
   echo
   echo "commands:"
-  echo "  info"
-  echo "  show {<components>}"
-  echo "  deploy {<components>}"
-  echo "  delete {<components>}"
+  echo "  info                    show info about current location"
+  echo "  show {<components>}     show info about components"
+  echo "  deploy {<components>}   deploy components"
+  echo "  delete {<components>}   delete deployment of components"
+  echo "  add {<components>}      create a frame for a new component"
 }
 
 showComponent()
@@ -173,14 +174,26 @@ CMD_info()
   local label
   local dep
   local i
-  info "$nCOMPONENTS:"
-  for c in "${!COMPONENTS[@]}"; do
-    showComponent "$c"
-  done
-  echo 
-  order=( )
-  getValueList order order METAJSON
-  info "$nTOOL order: ${order[@]}"
+
+  info "$nLANDSCAPE" "$ROOT"
+  if [ ${opts[all]+set} ]; then
+    info "$nCOMPONENTS:"
+    for c in "${!COMPONENTS[@]}"; do
+      showComponent "$c"
+    done
+    echo 
+    order=( )
+    getValueList order order METAJSON
+    info "$nTOOL order: ${order[@]}"
+  else
+    if [ -n "$CURRENT" ]; then
+      showComponent "$COMPONENT"
+    else
+      if [ -n "$PRODUCTDIR" ]; then
+        info "$nPRODUCT" "$PRODUCT (${PRODUCTDIR#$ROOT/})"
+      fi
+    fi
+  fi
 }
 
 
@@ -292,6 +305,7 @@ execClosure()
   $cmd "${comps[@]}" 
 }
 
+
 resolveComponents()
 {
   comps=( )
@@ -307,13 +321,80 @@ resolveComponents()
   done
 }
 
+CMD_add()
+{
+  local productdir="$PRODUCTDIR"
+  local product="$PRODUCT"
+  if [ -n "${opts[$nPRODUCT]}" ]; then
+    product="$(CMDS_resolve_shortcut "${opts[$nPRODUCT]}" "${!PRODUCTS[@]}")"
+    productdir="${PRODUCTS[$product]}"
+    if [ -z "$productdir" ]; then
+      fail "unknown $nPRODUCT ${opts[$nPRODUCT]}"
+    fi
+    productdir="$ROOT/$productdir"
+  fi
+  if [ -z "$productdir" ]; then
+    fail "please select a $nPRODUCT"
+  fi
+  if [ $# -eq 0 ]; then
+      fail "component name required"
+  fi
+
+  for c in "$@"; do
+    COMPDIR="$productdir/$dCOMPONENTS/$c"
+
+    if [ -n "${COMPONENTS["$c"]}" ]; then
+        fail "$nCOMPONENT $c already exists"
+    fi
+    if [ -d "$COMPDIR" ]; then
+        fail "folder for $nCOMPONENT $c already exists"
+    fi
+    
+    info "creating $nCOMPONENT $c in $nPRODUCT $product"
+
+    mkdir -p "$COMPDIR/lib"
+    cat <<EOF >"$COMPDIR/lib/action"
+#
+# remove this file if no dediyted deploy or delete code
+# is required
+#
+deploy()
+{
+  true
+}
+
+delete()
+{
+  true
+}
+EOF
+    chmod a+x "$COMPDIR/lib/action"
+
+    cat <<EOF > "$COMPDIR/component.yaml"
+---
+component:
+  imports: []
+
+  stubs: []
+EOF
+    cat <<EOF > "$COMPDIR/deployment.yaml"
+---
+imports: (( &temporary ))
+
+plugins:
+EOF
+    echo "---" > "$COMPDIR/export.yaml"
+    echo "state:" > "$COMPDIR/state.yaml"
+  done
+}
+
 ###########################################################################
 # main
 ###########################################################################
 
 declare -g -A opts
 declare -g -A params
-params=( [a]=all [A]=All [v]=verbose [version]="" [dryrun]="" [x]=trace [D]=debug )
+params=( [a]=all [A]=All [v]=verbose [version]="" [dryrun]="" [x]=trace [D]=debug [p]="=$nPRODUCT" )
 OPT_parse_options params opts "$@"
 shift $(( _cnt - 1 ))
 
@@ -344,7 +425,7 @@ export DRYRUN
 export DEBUG
 export VERBOSE
 
-CMDS=( deploy delete info show help version )
+CMDS=( deploy delete info show help version add )
 cmd="$(CMDS_resolve_shortcut "$1" "${CMDS[@]}")"
 
 if [ "$cmd" == version -o "$cmd" == help ]; then

@@ -54,6 +54,15 @@ getProductDir()
   echo "${dir%/*}"
 }
 
+getProductForDir()
+{
+  if [ "$1" == "$ROOTPRODUCTDIR" ]; then
+    echo "$MAINPRODUCT"
+  else
+    echo "${1##*/}"
+  fi
+}
+
 setComponent()
 {
   product=
@@ -61,11 +70,7 @@ setComponent()
   productdir="$(getProductDir "$1")"
   if [ -n "$productdir" ]; then
     reldir="${1#$ROOT/}"
-    if [ "$productdir" == "$ROOTPRODUCTDIR" ]; then
-      product="$MAINPRODUCT"
-    else
-      product="${productdir##*/}"
-    fi
+    product="$(getProductForDir "$productdir")"
     component="${1#$productdir/$dCOMPONENTS/}"
   fi
 }
@@ -112,6 +117,13 @@ if [ -n "$CURRENT" ]; then
   else
     PRODUCT="$product"
     COMPONENT="$component"
+  fi
+else 
+  PRODUCTDIR="$(getProductDir "$(pwd)")"
+  if [ -n "$PRODUCTDIR" ]; then
+    PRODUCT="$(getProductForDir "$PRODUCTDIR")"
+  else
+    PRODUCT=
   fi
 fi
 
