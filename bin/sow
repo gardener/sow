@@ -64,6 +64,32 @@ source "$SOWLIB/env"
 source "$SOWLIB/cmd"
 source "$SOWLIB/action"
 
+jsonAddElem()
+{
+  local new
+  if [ $# -eq 3 ]; then
+    new="\"$2\": $3"
+  else
+    new="$2"
+  fi
+
+  if [ -n "${!1}" ]; then
+    new="${!1}, $new"
+  else
+    new="$new"
+  fi
+  eval $1="\"\$new\""
+}
+
+jsonAdd()
+{
+  if [ $# -eq 3 ]; then
+    jsonAddElem "$1" "$2" "\"$3\""
+  else
+    jsonAddElem "$1" "\"$2\""
+  fi
+}
+
 setupProductMeta()
 {
   local d
@@ -92,6 +118,10 @@ setupProductMeta()
 
 setupComponentMeta()
 {
+  local jattr
+  local jgraph
+  local jdeps
+
   setComponent "${1%/*}"
   verbose "  $component: $reldir ($product)"
   getComponentJSON "$line"
@@ -104,24 +134,26 @@ setupComponentMeta()
 
   COMPONENTS["$component"]="$reldir"
 
-  setjsonvalue METAJSON "components[\"$component\"].active" "$active"
-  setjsonvalue METAJSON "components[\"$component\"].dir" "$reldir"
-  setjsonvalue METAJSON "components[\"$component\"].product" "$product"
-  setjsonjson METAJSON "components[\"$component\"].imports" "[]"
-  if [ $active == true ]; then
-    setjsonjson METAJSON "graph[\"$component\"]" "[]"
-  fi
-  local cnt=0
+  jsonAddElem jattr active "$active"
+  jsonAdd jattr dir "$reldir"
+  jsonAdd jattr product "$product"
+
   for i in "${!import_map[@]}"; do
     i="$(sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'<<<"$i")"
     verbose "    $i: ${import_map["$i"]}"
-    setjsonvalue METAJSON "components[\"$component\"].imports[$cnt].label" "$i"
-    setjsonvalue METAJSON "components[\"$component\"].imports[$cnt].component" "${import_map["$i"]}"
-    if [ $active == true ]; then
-      setjsonvalue METAJSON "graph[\"$component\"][$cnt]" "${import_map["$i"]}"
-    fi
-    (( cnt+=1 ))
+
+    local jdep=""
+    jsonAdd jdep label "$i"
+    jsonAdd jdep component "${import_map["$i"]}"
+    jsonAddElem jdeps "{ $jdep }"
+    jsonAdd jgraph "${import_map["$i"]}"
   done
+  jsonAddElem jattr imports "[ $jdeps ]"
+
+  setjsonjson METAJSON "components[\"$component\"]" "{ $jattr }"
+  if [ $active == true ]; then
+    setjsonjson METAJSON "graph[\"$component\"]" "[ $jgraph ]"
+  fi
 }
 
 setupLandscape()
