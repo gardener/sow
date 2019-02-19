@@ -64,7 +64,7 @@ source "$SOWLIB/env"
 source "$SOWLIB/cmd"
 source "$SOWLIB/action"
 
-jsonAddElem()
+jsonAdd()
 {
   local new
   if [ $# -eq 3 ]; then
@@ -81,12 +81,12 @@ jsonAddElem()
   eval $1="\"\$new\""
 }
 
-jsonAdd()
+jsonAddString()
 {
   if [ $# -eq 3 ]; then
-    jsonAddElem "$1" "$2" "\"$3\""
+    jsonAdd "$1" "$2" "\"$3\""
   else
-    jsonAddElem "$1" "\"$2\""
+    jsonAdd "$1" "\"$2\""
   fi
 }
 
@@ -96,13 +96,16 @@ setupProductMeta()
   local product
   local rel
 
+  local jprod
+
   rel="${1#$ROOT/}"
   product="${2:-${1##*/}}"
   if [ -n "${PRODUCTS["$product"]}" ]; then
     fail "$nPRODUCT $product ($rel) defined twice; ${PRODUCTS["$product"]}"
   fi
   PRODUCTS["$product"]="$rel"
-  setjsonvalue METAJSON "products[\"$product\"].dir" "$rel"
+  jsonAddString jprod dir "$rel"
+  jsonAdd JMETAPRODS "$product" "{ $jprod }"
 
   verbose "found $nPRODUCT $product: $rel"
   while IFS= read -r line; do
@@ -134,35 +137,43 @@ setupComponentMeta()
 
   COMPONENTS["$component"]="$reldir"
 
-  jsonAddElem jattr active "$active"
-  jsonAdd jattr dir "$reldir"
-  jsonAdd jattr product "$product"
+  jsonAdd jattr active "$active"
+  jsonAddString jattr dir "$reldir"
+  jsonAddString jattr product "$product"
 
   for i in "${!import_map[@]}"; do
     i="$(sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'<<<"$i")"
     verbose "    $i: ${import_map["$i"]}"
 
     local jdep=""
-    jsonAdd jdep label "$i"
-    jsonAdd jdep component "${import_map["$i"]}"
-    jsonAddElem jdeps "{ $jdep }"
-    jsonAdd jgraph "${import_map["$i"]}"
+    jsonAddString jdep label "$i"
+    jsonAddString jdep component "${import_map["$i"]}"
+    jsonAdd jdeps "{ $jdep }"
+    jsonAddString jgraph "${import_map["$i"]}"
   done
-  jsonAddElem jattr imports "[ $jdeps ]"
+  jsonAdd jattr imports "[ $jdeps ]"
 
-  setjsonjson METAJSON "components[\"$component\"]" "{ $jattr }"
+  jsonAdd JMETACOMPS "$component" "{ $jattr }"
   if [ $active == true ]; then
-    setjsonjson METAJSON "graph[\"$component\"]" "[ $jgraph ]"
+    jsonAdd JMETAGRAPH "$component" "[ $jgraph ]"
   fi
 }
 
 setupLandscape()
 {
   declare -Ag PRODUCTS COMPONENTS
-  METAJSON="{}"
+  local JMETAGRAPH=
+  local JMETACOMPS=
+  local JMETAPRODS=
+  local JMETA=
 
   setupProductMeta "$ROOTPRODUCTDIR" "$MAINPRODUCT"
 
+  jsonAdd JMETA products   "{ $JMETAPRODS }" 
+  jsonAdd JMETA components "{ $JMETACOMPS }" 
+  jsonAdd JMETA graph      "{ $JMETAGRAPH }" 
+
+  METAJSON="{ $JMETA }"
   METAJSON="$(spiff merge --json "$SOW/helper/closure.yaml" - "$SOWLIB/templates/graph.yaml" <<<"$METAJSON")"
   echo "$METAJSON" | jq .>"$META"
 
