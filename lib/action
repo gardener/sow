@@ -47,8 +47,8 @@ ACTION_execute()
   export KUBECONFIG
   export DOMAIN
 
-  if [ -x "$CURRENT/action" ]; then
-    echo "using local action sctipt"
+  if [ -f "$CURRENT/action" ]; then
+    info "using local action script"
     source "$CURRENT/action"
   fi
 
@@ -181,7 +181,7 @@ ACTION_execute()
   fi
 
   export DEPLOYMENTJSON="$deployment"
-  spiff merge - <<<"$deployment" > "$GENDIR/$fACTIONDEF" || fail "saving $nACTIONDEF"
+  spiff merge - <<<"$deployment" > "$GENDIR/$fACTIONDEF" || fail "saving $fACTIONDEF"
 
   case "$action" in
       (deploy) _deploy "$@";;
@@ -196,7 +196,7 @@ ACTION_execute()
 
 handle_exports()
 {
-  if [ "$CMD" != "delete" -a -f "$CURRENT/export.yaml" ]; then
+  if [ "$action" != "delete" -a -f "$CURRENT/export.yaml" ]; then
       if [ -f "$STATEDIR/state.yaml" ]; then
           spiff merge "$CURRENT/export.yaml" "${deploymentstubs[@]}" "$STATEDIR/state.yaml" > "$EXPORTDIR/export.yaml" || fail "processing exports"
       else
@@ -218,6 +218,8 @@ handle_exports()
         echo "exporting file $p"
         echo "$data" > "$EXPORTDIR/$p"
       done
+  else
+    rm -f "$EXPORTDIR/export.yaml"
   fi
 }
 

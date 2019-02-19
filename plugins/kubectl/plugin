@@ -1,20 +1,14 @@
 #!/usr/bin/env bash
 
-set -e
-
-source "$SOWLIB/utils"
+source "$SOWLIB/pluginutils"
 
 PLUGIN="$(dirname "${BASH_SOURCE[0]}")"
 
-field_path="${2:-kubectl}"
-dir="$GENDIR/$field_path"
-state="$STATEDIR/$field_path"
 manifestdir="$dir/manifests"
-mkdir -p "$dir" "$state" "$manifestdir"
-
+mkdir -p "$manifestdir"
 
 for h in "$PLUGIN/handlers"/*; do
-  if [ -h "$h" ]; then
+  if [ -f "$h" ]; then
     source "$h"
   fi
 done
@@ -76,12 +70,24 @@ exec_action()
   local apiversion
   local objectkey
   local objectentry
+  local res
 
   getManifestInfo "$(spiff merge --json "$3")"
 
   local group="${apiversion%/*}"
-  if [ "$group" == "$apiversion" ]; then
+  local suf
+  if [ "$group" = "$apiversion" ]; then
+    suf=
     group=core
+  else
+    suf=".$group"
+  fi
+  if [ "$1" = "delete" ]; then
+    res="$(kubectl --kubeconfig "$2" get "$kind$suf" --field-selector "metadata.name=$name" -o jsonpath={.items})"
+    if [ "$res" = '[]' ]; then
+      info "$kind $1 ($2) already deleted"
+      return
+    fi
   fi
   local f="action_${1}_${kind}_${group//\./_}"
   if _is_function "$f"; then

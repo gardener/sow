@@ -131,9 +131,9 @@ META="$GEN/meta.json"
 mkdir -p "$GEN" "$STATE" "$EXPORT"
 
 if [ -f "$ROOTPRODUCTDIR/$fCONFIG" ]; then
-  CONFIGJSON="$(spiff merge -json "$ROOTPRODUCTDIR/$fCONFIG" "$ROOT/$fCONFIG")"
+  CONFIGJSON="$(spiff merge --json "$ROOTPRODUCTDIR/$fCONFIG" "$ROOT/$fCONFIG")"
 else
-  CONFIGJSON="$(spiff merge -json "$ROOT/$fCONFIG")"
+  CONFIGJSON="$(spiff merge --json "$ROOT/$fCONFIG")"
 fi
 jq . <<<"$CONFIGJSON" >"$CONFIG"
 

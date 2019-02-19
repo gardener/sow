@@ -60,10 +60,20 @@ deploy() {
 delete() {
     if [ "$command" = "upgrade" ]; then
         info "Deleting helm deployment for $name"
+        tmp="/tmp/helmplugin$$"
         exec_cmd helm delete \
             --purge \
             $name \
-            $(echo "${helm_flags_delete[@]}")
+            $(echo "${helm_flags_delete[@]}") 2>"$tmp" || {
+                error="$(cat "$tmp")"
+                if [ "$error" != "Error: release: \"$name\" not found" ]; then
+                    rm -f "$tmp"
+                    fail "$error"
+                else
+                    info "release $name already deleted"
+                fi
+            }
+            rm -f "$tmp"
     fi
 }
 

@@ -26,6 +26,7 @@ help()
   echo
   echo "commands:"
   echo "  info                    show info about current location"
+  echo "  order {<components>}    show deployment order"
   echo "  show {<components>}     show info about components"
   echo "  deploy {<components>}   deploy components"
   echo "  delete {<components>}   delete deployment of components"
@@ -169,9 +170,9 @@ setupLandscape()
 
   setupProductMeta "$ROOTPRODUCTDIR" "$MAINPRODUCT"
 
-  jsonAdd JMETA products   "{ $JMETAPRODS }" 
-  jsonAdd JMETA components "{ $JMETACOMPS }" 
-  jsonAdd JMETA graph      "{ $JMETAGRAPH }" 
+  jsonAdd JMETA products   "{ $JMETAPRODS }"
+  jsonAdd JMETA components "{ $JMETACOMPS }"
+  jsonAdd JMETA graph      "{ $JMETAGRAPH }"
 
   METAJSON="{ $JMETA }"
   METAJSON="$(spiff merge --json "$SOW/helper/closure.yaml" - "$SOWLIB/templates/graph.yaml" <<<"$METAJSON")"
@@ -331,6 +332,23 @@ CMD_info()
   fi
 }
 
+CMD_order() {
+  execClosure _CMD_order "$@"
+}
+
+_CMD_order()
+{
+  for c in "${@}"; do
+    if ! contains "$c" "${order[@]}"; then
+      fail "$nCOMPONENT $c not found in ${nTOOL}ing order"
+    fi
+  done
+  for c in "${order[@]}"; do
+    if contains "$c" "${comps[@]}"; then
+      echo "$c"
+    fi
+  done
+}
 
 CMD_show()
 {
@@ -569,7 +587,7 @@ if [ -n "$PRODUCT" ]; then
 fi
 
 TRACE=
-if [ ${opts[trace]+set} ]; then 
+if [ ${opts[trace]+set} ]; then
   TRACE=X
   set -x
 fi
