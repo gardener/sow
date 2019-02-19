@@ -509,7 +509,7 @@ resolveComponents()
      if [ -z "$c" ]; then
        fail "unknown $nCOMPONENT $s"
      else
-       if [ -z "${COMPONEMTS["$c"]}" ]; then
+       if [ -z "${COMPONENTS["$c"]}" ]; then
          fail "unknown $nCOMPONENT $s"
        fi
        if ! contains "$c" "${comps[@]}"; then
