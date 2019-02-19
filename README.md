@@ -129,3 +129,135 @@ a kubernetes cluster.
 .   .
 .
 ```
+
+### The control files
+
+#### `acre.yaml`
+
+This file may contain any configuration informatio in any 
+structure required by the installation source.
+
+A convention is to use a node `landscape` to hold the
+configuartion information. 
+
+Using dedicated elements has an advantage for the later mergeing process,
+because it avoids undesired overrides and allows access to dedicated
+kinds of information for the yaml interpolation steps.
+
+This document is processed by spiff using an optional `acre.yaml` located 
+in the root installation source as template.
+Tis template can be used to provide defaults or to check and required values
+in the configuration (using _spiff_ features).
+
+The processing result is stored in `gen/config.json`. This file
+is used as stub for the processing of the other control files.
+
+#### `component.yaml`
+
+This file indicates the root folder of a component. It is used by
+_sow_ to extract control information for the component held in
+the node `component`.
+
+So far, three fields are used:
+- `imports`: a list of components the actual component depends on.
+   The import can be labeled by using the syntax 
+   
+   <p align="center">
+   _<label>_`: `_<component name>_
+   </p>
+
+   If a nested component (containing a `/`), there should be a label
+   to simplify the access during the interpolation process later on.
+
+- `stubs`: alist with stub files that should be added to the merging
+   processess for the other control files. Thise files typically
+   contain settings or utility functions, that should be used during the
+   interpolation process.
+   The given file names should be relative paths. They are lookuped
+   - locally to the component
+   - locally to the installation source
+   - locally to the _sow_ tool root
+
+- `active`: boolean value indication whether this component is active in
+  the actual landscape.
+
+This file is processed by _spiff_ using the landscape configuration
+and the tool's `component.yaml` template file as stub.
+
+#### `deployment.yaml`
+
+This document is used to describe the used plugins for a component and
+their configuration settings.
+It is processed by spiff using some stub files.
+
+- the last state document (described by `state.yaml`)
+- the effective installstion configuration `gen/config.json`
+- the import information (see below)
+- addtional stubs described by the `component.yaml`
+
+_sow_ evaluates the dependencies and generates an additional stub file
+containing the exports of all imported components.
+They are stored with their _label_ below the node `imports`.
+
+The effective deployment configuration is stored in the `gen` below the
+component folder.
+
+It should contain a `plugins` node listing the plugins that should be executed.
+A plugin entry may take additional string arguments.
+
+By convention, the first argument describes the path of the yaml node that
+contains the configuration for the plugin call. By default a plugin
+should assume its name as path.
+
+The denoted path should then contain the actual configuration for
+the plugin. This way the same plugin can be called multiple times
+with different settings.
+
+The execution order is taken from the list order and reversed for the deletion
+of a component.
+
+#### `state.yaml`
+
+This file should describe the information that should be kept
+for subsequent executions
+
+It uses the `deployment.yaml`and all the stubs used for its processing as
+stub.
+
+#### `export.yaml`
+
+This file should describe the information intended for reuse by other
+components. By convention it should be stored below an `export` node.
+
+It uses the `deployment.yaml` and all the stubs used for its processing as
+stub. As state the state of the actual execution is used.
+
+
+### The command
+
+_sow_ evaluates the current working directory fo figure out
+- the concrete installation folder
+- the actual product 
+- the actual component 
+
+This information is then used as default for its execution.
+
+By default _sow_ interprets its arguments as components that should be 
+deployed and executes theit deploy action in the appropriate order.
+
+The following sub commands are supported:
+
+- `deploy`:  (default)  deploy components
+- `delete`:  delete components
+- `show`: show meta data of given components
+- `info`: show info about actual position in filesystem
+- `version`: show tool version
+
+The command supports the following options:
+- `-a`: complete the component list
+        for `info` it shows the complete component and product list
+        for `deploy` and `delete` completes the dpeloy are delete
+        order according to the configured component dependencies.
+- `-A`: `deploy`and `delete` work on all active components
+- `-x`: enables trace mode
+- `-v`: enables verbose mode
