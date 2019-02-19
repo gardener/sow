@@ -17,27 +17,32 @@ help()
   echo "$nTOOL [<options>] [<command>]"
   echo
   echo "options:"
-  echo "  -a         complete the $nCOMPONENT set"
-  echo "  -A         use all $nCOMPONENTS if no one is specified"
-  echo "  -v         verbose mode"
-  echo "  -t         trace mode"
-  echo "  -D         debug mode"
-  echo "  --version  show version"
+  echo "    -a         complete the $nCOMPONENT set"
+  echo "    -A         use all $nCOMPONENTS if no one is specified"
+  echo "    -v         verbose mode"
+  echo "    -t         trace mode"
+  echo "    -D         debug mode"
+  echo "    --version  show version"
   echo
   echo "commands:"
-  echo "  info                    show info about current location"
-  echo "  order {<components>}    show deployment order"
-  echo "  show {<components>}     show info about components"
-  echo "  deploy {<components>}   deploy components"
-  echo "  delete {<components>}   delete deployment of components"
-  echo "  add {<components>}      create a frame for a new component"
+  echo "  info  [-al]                 show info about current location"
+  echo "    -l                        show extended $nCOMPONENT info"
+  echo "    -a                        show all $nCOMPONENTS in landscape"
+  echo "  order [-daA] {<components>} show $nCOMPONENT order"
+  echo "    -d         deletion order"
+  echo "    -a         complete according to dependencies"
+  echo "    -A         use all $nCOMPONENTS"
+  echo "  show {<components>}         show info about components"
+  echo "  deploy {<components>}       deploy components"
+  echo "  delete {<components>}       delete deployment of components"
+  echo "  add {<components>}          create a frame for a new component"
 }
 
 source "$SOWLIB/utils"
 source "$SOWLIB/meta"
 source "$SOWLIB/opts"
 
-declare -A opts
+declare -A opts=( )
 declare -A params
 params=( [a]=all [A]=All [v]=verbose [version]="" [dryrun]="" [x]=trace [D]=debug [p]="=$nPRODUCT" [terms]="=" [layout]="=" )
 OPT_parse_options params opts "$@"
@@ -311,42 +316,62 @@ CMD_info()
   local dep
   local i
 
+  local data=$(declare -p opts)
+  declare -A params
+  eval "declare -A iopts="${data#*=}
+  params=( [l]=long [a]=all )
+  OPT_parse_options params iopts "$@"
+  shift $(( _cnt - 1 ))
+
   info "$nLANDSCAPE" "$ROOT"
-  if [ ${opts[all]+set} ]; then
+  if [ ${iopts[all]+set} ]; then
     info "$nCOMPONENTS:"
     for c in "${!COMPONENTS[@]}"; do
-      showComponent "$c"
+      if [ ${iopts[long]+set} ]; then
+        showComponent "$c"
+      else
+        info "  - $c: (${COMPONENTS["$c"]})"
+      fi
     done
     echo
     order=( )
     getValueList order order METAJSON
     info "$nTOOL order: ${order[@]}"
   else
+    if [ -n "$PRODUCTDIR" ]; then
+      info "$nPRODUCT" "$PRODUCT (${PRODUCTDIR#$ROOT/})"
+    fi
     if [ -n "$CURRENT" ]; then
-      showComponent "$COMPONENT"
-    else
-      if [ -n "$PRODUCTDIR" ]; then
-        info "$nPRODUCT" "$PRODUCT (${PRODUCTDIR#$ROOT/})"
+      if [ ${iopts[long]+set} ]; then
+        showComponent "$COMPONENT"
+      else 
+        info "$nCOMPONENT: $COMPONENT (${COMPONENTS["$COMPONENT"]})"
       fi
     fi
   fi
 }
 
-CMD_order() {
-  execClosure _CMD_order "$@"
+CMD_order()
+{
+  local data="$(declare -p opts)"
+  declare -A params
+  eval "declare -A iopts="${data#*=}
+  params=( [d]=delete [a]=all [A]=All )
+  OPT_parse_options params opts "$@"
+  shift $(( _cnt - 1 ))
+
+  local opt=
+  if [ ${opts[delete]+set} ]; then
+    opt=-r
+  fi 
+
+  execClosure $opt _CMD_order "$@"
 }
 
 _CMD_order()
 {
   for c in "${@}"; do
-    if ! contains "$c" "${order[@]}"; then
-      fail "$nCOMPONENT $c not found in ${nTOOL}ing order"
-    fi
-  done
-  for c in "${order[@]}"; do
-    if contains "$c" "${comps[@]}"; then
-      echo "$c"
-    fi
+    echo "$c"
   done
 }
 
@@ -375,98 +400,118 @@ CMD_deploy()
 
 _CMD_deploy()
 {
-  for c in "${@}"; do
-    if ! contains "$c" "${order[@]}"; then
-      fail "$nCOMPONENT $c not found in ${nTOOL}ing order"
-    fi
-  done
-  for c in "${order[@]}"; do
-    if contains "$c" "${comps[@]}"; then
-      echo "${nTOOL}ing $nCOMPONENT $c"
-      ACTION_execute deploy "$c"
-    fi
+  for c in "$@"; do
+    echo "*****************************"
+    echo "*** ${nTOOL}ing $nCOMPONENT $c"
+    ACTION_execute deploy "$c"
   done
 }
 
 CMD_delete()
 {
-  execClosure _CMD_delete "$@"
+  execClosure -r _CMD_delete "$@"
 }
 
 _CMD_delete()
 {
-  for c in "${@}"; do
-    if ! contains "$c" "${order[@]}"; then
-      fail "$nCOMPONENT $c not found in ${nTOOL}ing order"
-    fi
+  for c in "$@"; do
+    echo "*****************************"
+    echo "*** deleting $nCOMPONENT $c"
+    ACTION_execute delete "$c"
   done
-  for c in "${order[@]}"; do
-    if contains "$c" "${comps[@]}"; then
-      echo "${nTOOL}ing $nCOMPONENT $c"
-      ACTION_execute delete "$c"
+}
+
+
+getOrder()
+{
+  local order_field=order
+  if [ "$1" = -r ]; then
+    order_field=usedorder
+    shift
+  fi
+
+  if [ $# -eq 1 ]; then
+    getValueList $1 $order_field METAJSON
+  else 
+    local _order=( )
+    for c in "${@:2}"; do
+      local _tmp=( )
+      getValueList _tmp "closures[\"$c\"].$order_field" METAJSON
+      _order=( "${_order[@]}" "${_tmp[@]}" )
+    done
+    setUniq $1 "${_order[@]}"
+  fi
+}
+
+orderComps()
+{
+  local order_field=order
+  if [ "$1" = -r ]; then
+    order_field=usedorder
+    shift
+  fi
+
+  local a=( )
+  eval $1="( )"
+  getValueList a $order_field METAJSON
+  for c in "${a[@]}"; do
+    if contains "$c" "$@"; then
+      eval $1="( \"\${$1[@]}\" \"$c\" )"
     fi
   done
 }
 
 execClosure()
 {
-  local cmd="$1"
-  local order=( )
-  local tmp=( )
+  local opt=
   local comps=( )
-  local o
-  shift
-
-  resolveComponents "$@"
-
-  getValueList tmp order METAJSON
-  if [ "$cmd" == _CMD_delete ]; then
-    for o in "${tmp[@]}"; do
-      order=( "$o" "${order[@]}" )
-    done
-  else
-    order=( "${tmp[@]}" )
+  local order_field=order
+  if [ "$1" = -r ]; then
+    opt=-r
+    order_field=usedorder
+    shift
   fi
 
-  if [ ${#comps[@]} -eq 0 ]; then
-    if [ ${opts[All]+set} ]; then
-       comps=( "${order[@]}" )
-    else
-      if [ -z "$COMPONENT" ]; then
-        fail "not in a $nCOMPONENT"
+  if [ $# -ne 1 ]; then
+    resolveComponents "${@:2}"
+  else
+    if [ -z "$COMPONENT" ]; then
+      if [ ${iopts[All]+set} ]; then
+        comps=( )
       else
-        comps=( "$COMPONENT" )
+        fail "not in a $nCOMPONENT"
       fi
+    else
+      comps=( "$COMPONENT" )
     fi
   fi
 
-  local cnt=0
   if [ ${opts[all]+set} ]; then
-     tmp=( )
-     for o in "${order[@]}"; do
-       tmp=( "${tmp[@]}" "$o" )
-       if contains "$o" "${comps[@]}"; then
-         (( cnt+=1 ))
-         if [ $cnt -eq ${#comps[@]} ]; then
-           break
-         fi
-       fi
-     done
-     comps=( "${tmp[@]}" )
+    getOrder $opt order "${comps[@]}"
+  else
+    local tmp=( )
+    orderComps $opt order "${comps[@]}"
   fi
 
-  $cmd "${comps[@]}"
+  $1 "${order[@]}"
 }
 
 
 resolveComponents()
 {
+  local s
+  local c
+
   comps=( )
+
   for s in "$@"; do
      c="$(CMDS_resolve_shortcut "$s" "${!COMPONENTS[@]}")"
      if [ -z "$c" ]; then
        fail "unknown $nCOMPONENT $s"
      else
+       if [ -z "${COMPONEMTS["$c"]}" ]; then
+         fail "unknown $nCOMPONENT $s"
+       fi
        if ! contains "$c" "${comps[@]}"; then
          comps=( "${comps[@]}" "$c" )
        fi

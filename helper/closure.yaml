@@ -1,9 +1,14 @@
 
 utilities:
+  <<: (( &temporary(merge) ))
+  _combine: (( |g,i|->map{g|k,v|->v {$usedby=i.[k].deps, $usedorder=i.[k].order}} ))
+  combine: (( |graph|->_._combine(_.graph.evaluate(graph), _.graph.evaluate(_.graph.invert(graph)))  ))
+
 graph:
 components:
 products:
 
-closures: (( utilities.graph.evaluate(graph) ))
+closures: (( utilities.combine(graph) ))
 cycles: (( utilities.graph.cycles(closures) ))
 order: (( utilities.graph.order(closures) ))
+usedorder: (( utilities.graph.reverse(order) ))

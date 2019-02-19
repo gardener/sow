@@ -72,6 +72,28 @@ contains()
   return 1
 }
 
+setReverse()
+{ 
+  local a=( )
+  local o
+  for o in "${@:2}"; do
+    a=( "$o" "${a[@]}" )   
+  done
+  eval "$1"="( \"\${a[@]}\" )"
+}
+
+setUniq()
+{ local a=( )
+  local v
+  
+  for v in "${@:2}"; do
+    if ! contains "$v" "${a[@]}"; then
+      a=( "${a[@]}" "$v" )
+    fi
+  done
+  eval "$1"="( \"\${a[@]}\" )"
+}
+
 executionLoop()
 {
   local cmd="$1"

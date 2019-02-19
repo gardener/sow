@@ -14,6 +14,8 @@ utilities:
     norm: (( |model,comp,deps|->($d= _.reverse(uniq(_.reverse(deps.deps)))) { $deps=d, $err=_.cycle(deps.err), $order=_.reverse([comp] d), $missing=_.missing(model,comp) } ))
     reverse: (( |list|->sum[list|[]|s,e|->[e] s] ))
 
+    invert: (( |graph|->map{graph|c,l|->sum[graph|[]|s,k,v|->contains(v,c) ? s k :s ]} ))
+
     evaluate: (( |model|->sum[model|{}|s,k,v|->s { k=_.norm(model,k,_._dep(model,k,[]))}] ))
     cycles: (( |result|->uniq(sum[result|[]|s,k,v|-> v.err ? s [v.err] :s]) ))
     order: (( |result|->uniq(_.reverse(sum[result|[]|s,k,v|->s [k] v.deps])) ))
