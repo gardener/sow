@@ -72,4 +72,60 @@ The first use case is to install a garden with a
 [gardener](https://github.com/gardener/gardener) on
 a kubernetes cluster.
 
+### The filesystem structure
 
+```
+├── acre.yaml                  # config of the concreate installation instance
+├── garden                     # the installation source for the landscape
+│   ├── acre.yaml
+│   ├── components             # components of the root installation source
+│   │   ├── comp1
+│   │   │   ├── component.yaml
+│   │   │   ├── deployment.yaml
+│   │   │   ├── state.yaml
+│   │   │   └── export.yaml
+│   │   ├── nested            # components may be nested
+│   │   │   └── comp2
+│   │   │       ├── component.yaml
+│   │   │       ├── deployment.yaml
+│   │   │       ├── lib
+│   │   │       │   └── action
+│   │   .       ├── state.yaml
+│   │   .       └── export.yaml
+│   │   .
+│   │
+│   └── greenhouses           # recursively included instellation sources
+│       └── nestedproduct     # name as root of the installation source
+│           └── components
+│               ├── testcomp
+│               │   ├── component.yaml
+│               │   ├── deployment.yaml
+│               │   .
+│               │   .
+│               │   .
+│               │    
+│               ├── greenhouses  # recursively included instellation sources
+│               │   ├── othernestedproduct
+│               │   .
+│               .   .
+│               .   .
+│               .
+│
+├── state                       # state that needs to be persisted
+│   ├── <components>
+│   .
+│   .
+│   .
+│
+├── export                      # information flow among components
+│   ├── <components>
+│   .
+│   .
+│   .
+│
+├── gen                         # temporary files (can be deleted at any time)
+│   ├── <components>
+.   .
+.   .
+.
+```
