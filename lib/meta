@@ -14,3 +14,12 @@ getMetaProductDir()
 {
   getValue $1 "products[\"$2\"].dir" METAJSON
 }
+
+getMetaUsedby()
+{
+  if [ "$2" != "" ]; then
+    getValueList $1 "usedby[\"$2\"]" METAJSON
+  else
+    getJSON $1 usedby METAJSON
+  fi
+}

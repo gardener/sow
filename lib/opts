@@ -113,8 +113,8 @@ _check_opt()
     v="${1#*=}"
   fi
 
-  if [ ${_opts[$k]+set} ]; then
-    local s="${_opts[$k]}"
+  if [ ${_opts["$k"]+set} ]; then
+    local s="${_opts["$k"]}"
     local n="${s#=}"
     if [ "$n" == "$s" ]; then
       # no arg expected

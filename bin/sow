@@ -5,6 +5,15 @@ VERSION=0.1
 SOW="$(cd "$(dirname "${BASH_SOURCE[0]}")/.."; echo "$PWD" )"
 SOWLIB="$SOW/lib"
 
+trap handle_error ERR EXIT
+
+handle_error()
+{
+  if [ $? -ne 0 -a \( -z "$INTENDED_EXIT" -o -n "$DEBUG" \) ]; then
+      print_stacktrace 1
+  fi
+}
+
 get_version()
 {
   echo "$nTOOL version $VERSION"
@@ -12,30 +21,32 @@ get_version()
 
 help()
 {
-  echo "$nTOOL - a tiny installer framework based on components and plugins"
+  confirm "$nTOOL - a tiny installer framework based on components and plugins"
   echo
-  echo "$nTOOL [<options>] [<command>]"
+  title "$nTOOL [<options>] [<command>]"
   echo
-  echo "options:"
-  echo "    -a         complete the $nCOMPONENT set"
-  echo "    -A         use all $nCOMPONENTS if no one is specified"
-  echo "    -v         verbose mode"
-  echo "    -t         trace mode"
-  echo "    -D         debug mode"
-  echo "    --version  show version"
+  title "options:"
+  found "    -a          complete the $nCOMPONENT set"
+  found "    -A          use all $nCOMPONENTS if no one is specified"
+  found "    -v          verbose mode"
+  found "    -t          trace mode"
+  found "    -P <plugin> trace mode for given plugin"
+  found "    -D          debug mode"
+  found "    --version   show version"
   echo
-  echo "commands:"
-  echo "  info  [-al]                 show info about current location"
-  echo "    -l                        show extended $nCOMPONENT info"
-  echo "    -a                        show all $nCOMPONENTS in landscape"
-  echo "  order [-daA] {<components>} show $nCOMPONENT order"
-  echo "    -d         deletion order"
-  echo "    -a         complete according to dependencies"
-  echo "    -A         use all $nCOMPONENTS"
-  echo "  show {<components>}         show info about components"
-  echo "  deploy {<components>}       deploy components"
+  title "commands:"
+  info "  info  [-al]    show info about current location"
+  found "    -l          show extended $nCOMPONENT info"
+  found "    -a          show all $nCOMPONENTS in landscape"
+  info "  order [-daA] {<components>} show $nCOMPONENT order"
+  found "    -d          deletion order"
+  found "    -a          complete according to dependencies"
+  found "    -A          use all $nCOMPONENTS"
+  info "  show [-l]{<components>}     show info about components"
+  found "    -l          show extended $nCOMPONENT info"
+  info "  deploy {<components>}       deploy components"
   echo "  delete {<components>}       delete deployment of components"
-  echo "  add {<components>}          create a frame for a new component"
+  info "  add {<components>}          create a frame for a new component"
 }
 
 source "$SOWLIB/utils"
@@ -247,9 +258,10 @@ showComponent()
   local label
   local dep
   local dir
+  local usedby
   local i
 
-  info " - $c: ${COMPONENTS[$c]}"
+  title " - $c: ${COMPONENTS[$c]}"
   getComponentMeta comp "$c"
   getComponentMetaProduct prod comp
   getMetaProductDir dir "$prod"
@@ -261,7 +273,12 @@ showComponent()
   for i in "${imps[@]}"; do
     getValue label label i
     getValue dep component i
-    info "     - $label: $dep"
+    found "     - $label: $dep"
+  done
+  getMetaUsedby usedby "$c"
+  info "     direct users:"
+  for i in "${usedby[@]}"; do
+    found "     - $i"
   done
   ( # should be part of the landscape meta data, later on
     CURRENT="$ROOT/${COMPONENTS[$c]}"
@@ -278,9 +295,9 @@ showComponent()
         local stub
         stub="$(lookupStub "$i")"
         if [ -z "$stub" ]; then
-          info "     - $i (not found)"
+          error "     - $i (not found)"
         else
-          info "     - $i (${stub#$ROOT/})"
+          found "     - $i (${stub#$ROOT/})"
         fi
       done
     fi
@@ -289,12 +306,12 @@ showComponent()
   getValueList order "order" comp
   info "     $nTOOL order for required $nCOMPONENTS:"
   for i in "${order[@]}"; do
-    info "     - $i"
+    found "     - $i"
   done
   getValueList order "usedorder" comp
   info "     deletion order for using $nCOMPONENTS:"
   for i in "${order[@]}"; do
-    info "     - $i"
+    found "     - $i"
   done
 }
 
@@ -323,34 +340,34 @@ CMD_info()
 
   local data=$(declare -p opts)
   declare -A params
-  eval "declare -A iopts="${data#*=}
+  eval "declare -A opts="${data#*=}
   params=( [l]=long [a]=all )
-  OPT_parse_options params iopts "$@"
+  OPT_parse_options params opts "$@"
   shift $(( _cnt - 1 ))
 
-  info "$nLANDSCAPE" "$ROOT"
-  if [ ${iopts[all]+set} ]; then
-    info "$nCOMPONENTS:"
+  title "$nLANDSCAPE" "$ROOT"
+  if [ ${opts[all]+set} ]; then
+    title "$nCOMPONENTS:"
     for c in "${!COMPONENTS[@]}"; do
-      if [ ${iopts[long]+set} ]; then
+      if [ ${opts[long]+set} ]; then
         showComponent "$c"
       else
-        info "  - $c: (${COMPONENTS["$c"]})"
+        found "  - $c: (${COMPONENTS["$c"]})"
       fi
     done
     echo
     order=( )
     getValueList order order METAJSON
-    info "$nTOOL order: ${order[@]}"
+    title "$nTOOL order: ${order[@]}"
   else
     if [ -n "$PRODUCTDIR" ]; then
-      info "$nPRODUCT" "$PRODUCT (${PRODUCTDIR#$ROOT/})"
+      title "$nPRODUCT" "$PRODUCT (${PRODUCTDIR#$ROOT/})"
     fi
     if [ -n "$CURRENT" ]; then
-      if [ ${iopts[long]+set} ]; then
+      if [ ${opts[long]+set} ]; then
         showComponent "$COMPONENT"
       else
-        info "$nCOMPONENT: $COMPONENT (${COMPONENTS["$COMPONENT"]})"
+        title "$nCOMPONENT: $COMPONENT (${COMPONENTS["$COMPONENT"]})"
       fi
     fi
   fi
@@ -360,7 +377,7 @@ CMD_order()
 {
   local data="$(declare -p opts)"
   declare -A params
-  eval "declare -A iopts="${data#*=}
+  eval "declare -A opts="${data#*=}
   params=( [d]=delete [a]=all [A]=All )
   OPT_parse_options params opts "$@"
   shift $(( _cnt - 1 ))
@@ -376,12 +393,19 @@ CMD_order()
 _CMD_order()
 {
   for c in "${@}"; do
-    echo "$c"
+    found "$c"
   done
 }
 
 CMD_show()
 {
+  local data=$(declare -p opts)
+  declare -A params
+  eval "declare -A opts="${data#*=}
+  params=( [l]=long [A]=all )
+  OPT_parse_options params opts "$@"
+  shift $(( _cnt - 1 ))
+
   execClosure _CMD_show "$@"
 }
 
@@ -400,29 +424,45 @@ _CMD_show()
 
 CMD_deploy()
 {
+  local data="$(declare -p opts)"
+  declare -A params
+  eval "declare -A opts="${data#*=}
+  params=( [a]=all [A]=All )
+  OPT_parse_options params opts "$@"
+  shift $(( _cnt - 1 ))
+
   execClosure _CMD_deploy "$@"
 }
 
 _CMD_deploy()
 {
   for c in "$@"; do
-    echo "*****************************"
-    echo "*** ${nTOOL}ing $nCOMPONENT $c"
+    confirm "*****************************"
+    confirm "*** ${nTOOL}ing $nCOMPONENT $c"
     ACTION_execute deploy "$c"
+    confirm "*** $nCOMPONENT $c deployed"
   done
 }
 
 CMD_delete()
 {
+  local data="$(declare -p opts)"
+  declare -A params
+  eval "declare -A opts="${data#*=}
+  params=( [a]=all [A]=All )
+  OPT_parse_options params opts "$@"
+  shift $(( _cnt - 1 ))
+
   execClosure -r _CMD_delete "$@"
 }
 
 _CMD_delete()
 {
   for c in "$@"; do
-    echo "*****************************"
-    echo "*** deleting $nCOMPONENT $c"
+    confirm "*****************************"
+    confirm "*** deleting $nCOMPONENT $c"
     ACTION_execute delete "$c"
+    confirm "*** $nCOMPONENT $c deleted"
   done
 }
 
@@ -553,10 +593,10 @@ CMD_add()
         fail "folder for $nCOMPONENT $c already exists"
     fi
 
-    info "creating $nCOMPONENT $c in $nPRODUCT $product"
+    confirm "creating $nCOMPONENT $c in $nPRODUCT $product"
 
     mkdir -p "$COMPDIR/lib"
-    cat <<EOF >"$COMPDIR/lib/action"
+    cat <<EOF >"$COMPDIR/action"
 #
 # remove this file if no dediyted deploy or delete code
 # is required

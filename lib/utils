@@ -2,33 +2,33 @@
 
 set -e
 
+source "$SOWLIB/stdio"
+
 ################################################################################
 # standard utils
 ################################################################################
 
-fail() {
-    echo "Error: $@">&2
-    exit 1
-}
-
-error() {
-    echo "$@">&2
-}
-
-info () {
-    echo "$@"
-}
-
-debug() {
-  if [ -n "$DEBUG" ]; then
-    echo "$@"
+#
+# print the actual stacktrace
+# $1: number of omitted stack enries
+#
+print_stacktrace()
+{
+  local i=1
+  if [ -n "$1" ]; then
+    i=$(($1+1))
   fi
-}
 
-verbose() {
-  if [ -n "$VERBOSE" ]; then
-    echo "$@"
-  fi
+  while [ $i -lt ${#BASH_SOURCE[@]} ]; do
+    local line="${BASH_LINENO[$i-1]}"
+    echo "${FUNCNAME[$i]} [${BASH_SOURCE[$i]}+$line]"
+    i=$((i+1))
+  done | (
+    _start_color "${COLOR_RED}";
+    echo "*** stack trace "
+    column -t -s "  ";
+    _end_color
+  ) >&2
 }
 
 exec_cmd() {

@@ -1,0 +1,197 @@
+
+
+#############################################################################
+# Standard IO Operations
+#############################################################################
+
+color_mode=x
+color_bold=x
+
+
+COLOR_RED=$'\e[0;91m'
+COLOR_YELLOW=$'\e[0;92m'
+COLOR_GREEN=$'\e[0;32m'
+COLOR_BLUE=$'\e[0;34m'
+COLOR_MAGENTA=$'\e[0;35m'
+COLOR_CYAN=$'\e[0;36m'
+COLOR_LIGHT=$'\e[0;37m'
+COLOR_DARK=$'\e[0;90m'
+COLOR_END=$'\e[0m'
+
+COLOR_BOLD=$'\e[1m'
+
+# $1: color
+_start_color()
+{
+  [ "$color_mode" -a -t 1 ] && echo -n "$1" || true
+}
+
+_end_color()
+{
+  [ "$color_mode" -a -t 1 ] && echo -n "${COLOR_END}" || true
+}
+
+_echo()
+{
+  local c="$1"
+  local o
+  shift
+  if [ "$1" = "-n" ]; then
+    o="-n"
+    shift
+  fi
+  [ "$color_mode" -a -t 1 ] && echo $o "${c}${color_bold:+$COLOR_BOLD}$*${COLOR_END}"  || echo $o "$@"
+}
+
+debug()
+{
+  if [ -n "$DEBUG" ]; then
+    local color_bold=
+    color_dark "$@"
+  fi
+}
+
+verbose() {
+  if [ -n "$VERBOSE" ]; then
+    local color_bold=
+    color_cyan "$@"
+  fi
+}
+
+info()
+{
+  color_info "$@"
+}
+
+found()
+{
+  color_found "$@"
+}
+
+confirm()
+{
+  color_confirm "$@"
+}
+
+negative()
+{
+  color_red "$@"
+}
+
+hint()
+{
+  color_hint "$@"
+}
+
+title()
+{
+  color_title "$@"
+}
+
+warn()
+{
+  color_warn "$@"
+}
+
+error()
+{
+  color_error "$@"
+}
+
+fail()
+{
+  INTENDED_EXIT=X
+  error "$@"
+  exit 1
+  return 1
+}
+
+#
+# logical colors
+#
+color_found()
+{
+  color_dark "$@"
+}
+
+color_confirm()
+{
+  color_green "$@"
+}
+
+color_info()
+{
+  color_cyan "$@"
+}
+
+color_warn()
+{
+  color_yellow "$@"
+}
+
+color_error()
+{
+  color_red "$@"
+}
+
+color_hint()
+{
+  color_blue "$@"
+}
+
+color_title()
+{
+  color_magenta "$@"
+}
+
+#
+# technical colors
+#
+color_red()
+{
+  _echo "${COLOR_RED}" "$@"
+}
+
+color_yellow()
+{
+  _echo "${COLOR_YELLOW}" "$@"
+}
+
+color_cyan()
+{
+  _echo "${COLOR_CYAN}" "$@"
+}
+
+color_dark()
+{
+  _echo "${COLOR_DARK}" "$@"
+}
+
+color_light()
+{
+  _echo "${COLOR_LIGHT}" "$@"
+}
+
+color_green()
+{
+  _echo "${COLOR_GREEN}" "$@"
+}
+
+color_blue()
+{
+  _echo "${COLOR_BLUE}" "$@"
+}
+
+color_magenta()
+{
+  _echo "${COLOR_MAGENTA}" "$@"
+}
+
+bold()
+{
+  _echo "${COLOR_BOLD}" "$@"
+}
+
+
+
+
