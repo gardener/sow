@@ -263,12 +263,6 @@ showComponent()
     getValue dep component i
     info "     - $label: $dep"
   done
-  getJSON comp "closures[\"$c\"]" METAJSON
-  getValueList order "order" comp
-  info "     $nTOOL order:"
-  for i in "${order[@]}"; do
-    info "     - $i"
-  done
   ( # should be part of the landscape meta data, later on
     CURRENT="$ROOT/${COMPONENTS[$c]}"
     setComponent "$CURRENT"
@@ -291,6 +285,17 @@ showComponent()
       done
     fi
   )
+  getJSON comp "closures[\"$c\"]" METAJSON
+  getValueList order "order" comp
+  info "     $nTOOL order for required $nCOMPONENTS:"
+  for i in "${order[@]}"; do
+    info "     - $i"
+  done
+  getValueList order "usedorder" comp
+  info "     deletion order for using $nCOMPONENTS:"
+  for i in "${order[@]}"; do
+    info "     - $i"
+  done
 }
 
 CMD_help()
