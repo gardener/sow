@@ -476,7 +476,7 @@ execClosure()
     resolveComponents "${@:2}"
   else
     if [ -z "$COMPONENT" ]; then
-      if [ ${iopts[All]+set} ]; then
+      if [ ${opts[All]+set} ]; then
         comps=( )
       else
         fail "not in a $nCOMPONENT"
@@ -486,7 +486,7 @@ execClosure()
     fi
   fi
 
-  if [ ${opts[all]+set} ]; then
+  if [ ${opts[all]+set} ] || [ ${opts[All]+set} ]; then
     getOrder $opt order "${comps[@]}"
   else
     local tmp=( )
