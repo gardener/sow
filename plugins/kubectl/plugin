@@ -12,8 +12,8 @@ loadHandlers()
   local d
   local h
   for d in "$@"; do
-    if [ -d "$d" ]; then
-      for h in "$d"/*; do
+    if [ -d "$d/handlers" ]; then
+      for h in "$d/handlers"/*; do
         if [ -f "$h" ]; then
           source "$h"
         fi
@@ -87,14 +87,20 @@ exec_action()
 
   local group="${apiversion%/*}"
   local suf
+  local ns
   if [ "$group" = "$apiversion" ]; then
     suf=
     group=core
   else
     suf=".$group"
   fi
+  if [ -n "$namespace" ]; then
+    ns="-n $namespace"
+  else
+    ns=
+  fi
   if [ "$1" = "delete" ]; then
-    res="$(kubectl --kubeconfig "$2" get "$kind$suf" --field-selector "metadata.name=$name" -o jsonpath={.items})"
+    res="$(kubectl --kubeconfig "$2" $ns get "$kind$suf" --field-selector "metadata.name=$name" -o jsonpath={.items})"
     if [ "$res" = '[]' ]; then
       info "$kind $1 ($2) already deleted"
       return
