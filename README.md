@@ -252,6 +252,7 @@ The following sub commands are supported:
 - `show`: show meta data of given components
 - `info`: show info about actual position in filesystem
 - `version`: show tool version
+- `order`: show order of components and/or their deploy or deletion order
 
 The command supports the following options:
 - `-a`: complete the component list

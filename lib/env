@@ -38,13 +38,13 @@ getProductDir()
   if [ "$dir" == "$ROOT" ]; then
     return
   fi
-  while [ "${dir##*/}" !=  $dCOMPONENTS ]; do
+  while [ ! -d "$dir/$dCOMPONENTS" ]; do
     if [ "$dir" == "$ROOT" ]; then
       return
     fi
     dir="${dir%/*}"
   done
-  echo "${dir%/*}"
+  echo "$dir"
 }
 
 getProductForDir()
