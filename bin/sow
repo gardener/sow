@@ -44,7 +44,7 @@ source "$SOWLIB/opts"
 
 declare -A opts=( )
 declare -A params
-params=( [a]=all [A]=All [v]=verbose [version]="" [dryrun]="" [x]=trace [D]=debug [p]="=$nPRODUCT" [terms]="=" [layout]="=" )
+params=( [a]=all [A]=All [v]=verbose [version]="" [dryrun]="" [x]=trace [D]=debug [p]="=$nPRODUCT" [terms]="=" [layout]="=" [P]="=plugin" )
 OPT_parse_options params opts "$@"
 shift $(( _cnt - 1 ))
 

@@ -7,11 +7,22 @@ PLUGIN="$(dirname "${BASH_SOURCE[0]}")"
 manifestdir="$dir/manifests"
 mkdir -p "$manifestdir"
 
-for h in "$PLUGIN/handlers"/*; do
-  if [ -f "$h" ]; then
-    source "$h"
-  fi
-done
+loadHandlers()
+{
+  local d
+  local h
+  for d in "$@"; do
+    if [ -d "$d" ]; then
+      for h in "$d"/*; do
+        if [ -f "$h" ]; then
+          source "$h"
+        fi
+      done
+    fi
+  done
+}
+
+loadHandlers "$PLUGIN" "$CURRENT/lib/kubectl" "$PRODUCTDIR/lib/kubectl"
 
 for h in "${@:3}"; do
   echo "loading handler $h"

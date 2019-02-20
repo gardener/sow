@@ -65,12 +65,24 @@ ACTION_execute()
       eval args=( $line )
       if [ -n "${args[0]}" ]; then
         if _is_function "${args[0]}"; then
-           "${args[0]}" "$action" "${args[@]:1}"
+          (
+            if [ "${opts[plugin]}" = "${args[0]}" ]; then
+              export TRACE=X
+            fi
+            "${args[0]}" "$action" "${args[@]:1}"
+          )
         else
            local plugin
            plugin="$(lookupPlugin "${args[0]}")"
            if [ -n "$plugin" ]; then
-             "$plugin" "$action" "${args[@]:1}"
+              if [ "${opts[plugin]}" = "${args[0]}" ]; then
+                (
+                  export TRACE=X
+                  "$plugin" "$action" "${args[@]:1}"
+                )
+              else
+                "$plugin" "$action" "${args[@]:1}"
+              fi
            else
              fail "no action function or plugin with name '${args[0]}' found"
            fi
