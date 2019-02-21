@@ -43,18 +43,21 @@ help()
   found "    --version   show version"
   echo
   title "commands:"
-  info "  info  [-al]    show info about current location"
+  info "  info  [-al]                   show info about current location"
   found "    -l          show extended $nCOMPONENT info"
   found "    -a          show all $nCOMPONENTS in landscape"
-  info "  order [-daA] {<components>} show $nCOMPONENT order"
+  info "  order [-daA] {<components>}   show $nCOMPONENT order"
   found "    -d          deletion order"
   found "    -a          complete according to dependencies"
   found "    -A          use all $nCOMPONENTS"
-  info "  show [-l]{<components>}     show info about components"
+  info "  show [-l]{<components>}       show info about components"
   found "    -l          show extended $nCOMPONENT info"
-  info "  deploy {<components>}       deploy components"
-  echo "  delete {<components>}       delete deployment of components"
-  info "  add {<components>}          create a frame for a new component"
+  info "  deploy {<components>}         deploy components"
+  echo "  delete {<components>}         delete deployment of components"
+  info "  generate [-se] {<components>} execute generation step(s) only"
+  found "    -s          also the state step"
+  found "    -e          also the export step"
+  info "  add {<components>}            create a frame for a new component"
 }
 
 source "$SOWLIB/utils"
@@ -431,6 +434,34 @@ _CMD_show()
    done
 }
 
+CMD_generate()
+{
+  declare -A params=( [e]=exports [s]=state )
+  declare -A opts=( )
+  OPT_parse_options params opts "$@"
+  shift $(( _cnt - 1 ))
+
+  steps=( deployment )
+  if [ ${opts[state]+set} ]; then
+    steps=( "${steps[@]}" state )
+  fi
+  if [ ${opts[exports]+set} ]; then
+    steps=( "${steps[@]}" export )
+  fi
+
+  execClosure _CMD_generate "$@"
+}
+
+_CMD_generate()
+{
+  for c in "$@"; do
+    confirm "*****************************"
+    confirm "*** generating [$(join ", " "${steps[@]}")] for $nCOMPONENT $c"
+    ACTION_execute deploy "$c" "${steps[@]}"
+    confirm "*** $nCOMPONENT $c done"
+  done
+}
+
 CMD_deploy()
 {
   local data="$(declare -p opts)"
@@ -448,7 +479,7 @@ _CMD_deploy()
   for c in "$@"; do
     confirm "*****************************"
     confirm "*** ${nTOOL}ing $nCOMPONENT $c"
-    ACTION_execute deploy "$c"
+    ACTION_execute deploy "$c" all
     confirm "*** $nCOMPONENT $c deployed"
   done
 }
@@ -470,7 +501,7 @@ _CMD_delete()
   for c in "$@"; do
     confirm "*****************************"
     confirm "*** deleting $nCOMPONENT $c"
-    ACTION_execute delete "$c"
+    ACTION_execute delete "$c" all
     confirm "*** $nCOMPONENT $c deleted"
   done
 }
@@ -680,7 +711,7 @@ source "$SOWLIB/cmd"
 source "$SOWLIB/action"
 
 
-CMDS=( deploy delete info show help version add )
+CMDS=( deploy delete info show help version add generate )
 cmd="$(CMDS_resolve_shortcut "$1" "${CMDS[@]}")"
 
 verbose "$nLANDSCAPE = $ROOT"

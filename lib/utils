@@ -73,6 +73,15 @@ contains()
   return 1
 }
 
+
+join() {
+  local sep=$1 IFS=
+  local ret=$2
+  shift 2 || shift $(($#))
+  ret+="${*/#/$sep}"
+  echo "$ret"
+}
+
 setReverse()
 { 
   local a=( )

@@ -8,6 +8,7 @@ ACTION_setup()
   fi
   COMPONENT="$1"
 
+  debug "setting up environment for $nCOMPONENT $1"
   local comp
   getComponentMeta comp "$1"
   getComponentMetaProduct PRODUCT comp
@@ -28,6 +29,11 @@ ACTION_execute()
   ACTION_setup "$2"
   action="$1"
   shift 2
+
+  steps=( "$@" )
+  if contains all "${steps[@]}"; then
+    steps=( exec state export )
+  fi
 
   ##############################
   # GENERATE COMPONENT FOLDERS #
@@ -56,43 +62,9 @@ ACTION_execute()
   # HELPER FUNCTIONS #
   ####################
 
-  _exec_configured_plugins() {
-    local order=cat
-    if [ "$action" == "delete" ]; then
-      order=tac
-    fi
-    while IFS="" read -r line; do
-      eval args=( $line )
-      if [ -n "${args[0]}" ]; then
-        if _is_function "${args[0]}"; then
-          (
-            if [ "${opts[plugin]}" = "${args[0]}" ]; then
-              export TRACE=X
-            fi
-            "${args[0]}" "$action" "${args[@]:1}"
-          )
-        else
-           local plugin
-           plugin="$(lookupPlugin "${args[0]}")"
-           if [ -n "$plugin" ]; then
-              if [ "${opts[plugin]}" = "${args[0]}" ]; then
-                (
-                  export TRACE=X
-                  "$plugin" "$action" "${args[@]:1}"
-                )
-              else
-                "$plugin" "$action" "${args[@]:1}"
-              fi
-           else
-             fail "no action function or plugin with name '${args[0]}' found"
-           fi
-        fi
-      fi
-    done <<<"$(_jq_get_labeled_arg_list .plugins <<<"$DEPLOYMENTJSON" | $order)"
-  }
 
   _deploy() {
-    _exec_configured_plugins deploy
+    exec_configured_plugins deploy DEPLOYMENTJSON
     if _is_function "deploy"; then
        deploy "$@"
     fi
@@ -102,7 +74,7 @@ ACTION_execute()
     if _is_function "delete"; then
        delete "$@"
     fi
-    _exec_configured_plugins delete
+    exec_configured_plugins delete DEPLOYMENTJSON
   }
 
   ####################
@@ -195,19 +167,64 @@ ACTION_execute()
   export DEPLOYMENTJSON="$deployment"
   spiff merge - <<<"$deployment" > "$GENDIR/$fACTIONDEF" || fail "saving $fACTIONDEF"
 
-  case "$action" in
-      (deploy) _deploy "$@";;
-      (delete) _delete "$@";;
-      (*) fail "unknown command $action";;
-  esac
+  if contains exec "${steps[@]}";then 
+    case "$action" in
+        (deploy) _deploy "$@";;
+        (delete) _delete "$@";;
+        (*) fail "unknown command $action";;
+    esac
+  fi
 
-  handle_state
-  handle_exports
+  if contains state "${steps[@]}";then 
+    handle_state
+  fi
+  if contains export "${steps[@]}";then 
+    handle_exports
+  fi
   )
+}
+
+exec_configured_plugins() {
+  local action="$1"
+
+  debug "execute configured plugins for action $action"
+  local order=cat
+  if [ "$action" == "delete" ]; then
+    order=tac
+  fi
+  while IFS="" read -r line; do
+    eval args=( $line )
+    if [ -n "${args[0]}" ]; then
+      if _is_function "${args[0]}"; then
+        (
+          if [ "${opts[plugin]}" = "${args[0]}" ]; then
+            export TRACE=X
+          fi
+          "${args[0]}" "$action" "${args[@]:1}"
+        )
+      else
+         local plugin
+         plugin="$(lookupPlugin "${args[0]}")"
+         if [ -n "$plugin" ]; then
+            if [ "${opts[plugin]}" = "${args[0]}" ]; then
+              (
+                export TRACE=X
+                "$plugin" "$action" "${args[@]:1}"
+              )
+            else
+              "$plugin" "$action" "${args[@]:1}"
+            fi
+         else
+           fail "no action function or plugin with name '${args[0]}' found"
+         fi
+      fi
+    fi
+  done <<<"$(_jq_get_labeled_arg_list .plugins <<<"${!2}" | $order)"
 }
 
 handle_exports()
 {
+  debug handle export step
   if [ "$action" != "delete" -a -f "$CURRENT/export.yaml" ]; then
       if [ -f "$STATEDIR/state.yaml" ]; then
           spiff merge "$CURRENT/export.yaml" "${deploymentstubs[@]}" "$STATEDIR/state.yaml" > "$EXPORTDIR/export.yaml" || fail "processing exports"
@@ -242,6 +259,7 @@ restore() {
 
 handle_state()
 {
+  debug handle state step
   if [ -f "$CURRENT/state.yaml" ]; then
       if [ -f "$STATEDIR/state.yaml" ]; then
           cp "$STATEDIR/state.yaml"  "$STATEDIR/state.yaml.bak"
