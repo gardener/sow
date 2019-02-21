@@ -620,8 +620,6 @@ delete()
   true
 }
 EOF
-    chmod a+x "$COMPDIR/lib/action"
-
     cat <<EOF > "$COMPDIR/component.yaml"
 ---
 component:
