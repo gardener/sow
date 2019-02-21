@@ -26,6 +26,7 @@ print_stacktrace()
   done | (
     _start_color "${COLOR_RED}";
     echo "*** stack trace "
+    echo "command: $BASH_COMMAND"
     column -t -s "  ";
     _end_color
   ) >&2

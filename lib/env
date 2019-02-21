@@ -71,10 +71,10 @@ setComponent()
 
 determineRoot()
 {(
-  while [ ! -f $fCONFIG -o ! -d $dROOTPRODUCT ]; do
+  while [ ! -f $fCONFIG -o ! -d $dROOTPRODUCT  -o -d "$dCOMPONENTS" ]; do
     cd ..
     if [ "$(pwd)" == / ]; then
-      fail "no $nLANDSCAPE found to $nTOOL"
+      return
     fi
   done
   pwd
@@ -96,6 +96,10 @@ getImports()
 
 
 ROOT="$(determineRoot)"
+if [ -z "$ROOT" ]; then
+  fail no acre found to $nTOOL
+fi
+
 export ROOT
 
 export ROOTPRODUCTDIR="$ROOT/$dROOTPRODUCT"
@@ -131,9 +135,9 @@ META="$GEN/meta.json"
 mkdir -p "$GEN" "$STATE" "$EXPORT"
 
 if [ -f "$ROOTPRODUCTDIR/$fCONFIG" ]; then
-  CONFIGJSON="$(spiff merge --json "$ROOTPRODUCTDIR/$fCONFIG" "$ROOT/$fCONFIG")"
+  CONFIGJSON="$(spiff merge --json "$ROOTPRODUCTDIR/$fCONFIG" "$ROOT/$fCONFIG" || fail "processing $fCONFIG" )"
 else
-  CONFIGJSON="$(spiff merge --json "$ROOT/$fCONFIG")"
+  CONFIGJSON="$(spiff merge --json "$ROOT/$fCONFIG" || fail "processing $fCONFIG")"
 fi
 jq . <<<"$CONFIGJSON" >"$CONFIG"
 

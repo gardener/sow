@@ -4,13 +4,21 @@ VERSION=0.1
 
 SOW="$(cd "$(dirname "${BASH_SOURCE[0]}")/.."; echo "$PWD" )"
 SOWLIB="$SOW/lib"
+TOOL="$(basename "$0")"
+
+set -e 
 
 trap handle_error ERR EXIT
 
 handle_error()
 {
-  if [ $? -ne 0 -a \( -z "$INTENDED_EXIT" -o -n "$DEBUG" \) ]; then
-      print_stacktrace 1
+  x=$?
+  if [ "$BASH_SUBSHELL" = "0"  ]; then
+    if [ $x -ne 0 -a -n "$STACKTRACE" -a \( -z "$INTENDED_EXIT" -o -n "$DEBUG" \) ]; then
+        print_stacktrace 1
+    fi
+    INTENDED_EXIT=X
+    DEBUG=
   fi
 }
 
@@ -21,7 +29,7 @@ get_version()
 
 help()
 {
-  confirm "$nTOOL - a tiny installer framework based on components and plugins"
+  confirm "$TOOL - a tiny installer framework based on components and plugins"
   echo
   title "$nTOOL [<options>] [<command>]"
   echo
@@ -55,9 +63,10 @@ source "$SOWLIB/opts"
 
 declare -A opts=( )
 declare -A params
-params=( [a]=all [A]=All [v]=verbose [version]="" [dryrun]="" [x]=trace [D]=debug [p]="=$nPRODUCT" [terms]="=" [layout]="=" [P]="=plugin" )
+params=( [a]=all [A]=All [v]=verbose [version]="" [dryrun]="" [x]=trace [D]=debug [p]="=$nPRODUCT" [terms]="=" [layout]="=" [P]="=plugin" [S]=stacktrace )
 OPT_parse_options params opts "$@"
 shift $(( _cnt - 1 ))
+
 
 CFG_LAYOUT=garden
 CFG_TERMS=garden
@@ -69,6 +78,9 @@ fi
 if [ -n "${opts[terms]}" ]; then
   CFG_TERMS="${opts[terms]}"
 fi
+source "$SOW/layout/struct/$CFG_LAYOUT"
+source "$SOW/layout/terms/$CFG_TERMS"
+
 
 case "$1" in
   version) get_version
@@ -77,9 +89,6 @@ case "$1" in
         exit 0;;
 esac
 
-source "$SOWLIB/env"
-source "$SOWLIB/cmd"
-source "$SOWLIB/action"
 
 jsonAdd()
 {
@@ -641,27 +650,37 @@ if [ ${opts[version]+set} ]; then
   exit 0
 fi
 
-if [ ${opts[verbose]+set} ]; then
-  VERBOSE=X
-else
-  VERBOSE=
-fi
-
 if [ ${opts[debug]+set} ]; then
   DEBUG=X
 else
   DEBUG=
 fi
-
+if [ ${opts[verbose]+set} ]; then
+  debug enable verbose
+  VERBOSE=X
+else
+  VERBOSE=
+fi
 if [ ${opts[dryrun]+set} ]; then
+  debug enable dryrun
   DRYRUN=X
 else
   DRYRUN=
 fi
 
+if [ ${opts[stacktrace]+set} ]; then
+  debug enable stacktrace
+  export STACKTRACE=x
+fi
+
 export DRYRUN
 export DEBUG
 export VERBOSE
+
+source "$SOWLIB/env"
+source "$SOWLIB/cmd"
+source "$SOWLIB/action"
+
 
 CMDS=( deploy delete info show help version add )
 cmd="$(CMDS_resolve_shortcut "$1" "${CMDS[@]}")"

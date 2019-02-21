@@ -101,7 +101,7 @@ error()
 fail()
 {
   INTENDED_EXIT=X
-  error "$@"
+  error "Error: $@" >&2
   exit 1
   return 1
 }
