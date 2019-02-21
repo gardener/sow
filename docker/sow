@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# This is a wrapper for sow that will execute sow using a docker image containing its dependencies
+docker run -v "$PWD":"$PWD" -w "$PWD" "sow" "$@"
