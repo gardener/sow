@@ -133,18 +133,18 @@ ACTION_execute()
   export COMPONENTJSON
 
   #
-  # evaluate deployment.yaml
-  # uses additional stubs, config.json, imports and state.yaml as stubs
-  #
-  # key plugins is used to detect plugins to call.
-  # the plugin name map be used as map key to specify and argument list
-  # plugins:           plugins: name         plugins:       (->unordered)
-  #  - name                                     name:
-  #  - name:                                    - arg1
-  #    - arg1                                   - arg2
-  #    - arg2
-  #
-  # the plugins are executed in the given order
+  # plugins:
+  #   - <name>
+  #   - <name>: <arg>
+  #   - <name>:
+  #      - <arg1>
+  #      - <arg2>
+  #   - <name>:
+  #        config: <yaml>   # will be passed in env as PLUGINCONFIGJSON
+  #        args:
+  #          - <arg1>
+  # the plugins are executed in the given order for deployment and
+  # in the reverse order for deletion
 
   deploymentstubs=( )
   deployment=
@@ -166,7 +166,6 @@ ACTION_execute()
 
   export DEPLOYMENTJSON="$deployment"
   spiff merge - <<<"$deployment" > "$GENDIR/$fACTIONDEF" || fail "saving $fACTIONDEF"
-
   if contains exec "${steps[@]}";then 
     case "$action" in
         (deploy) _deploy "$@";;
@@ -184,42 +183,60 @@ ACTION_execute()
   )
 }
 
+# $1: name
+# $2: executable
+# $3: action
+# $4...: args
+exec_plugin()
+{
+  if [ "${opts[plugin]}" = "${1}" ]; then
+    (
+      export TRACE=X
+      "${@:2}"
+    )
+  else
+    "${@:2}"
+  fi
+}
+
+# $1: action
+# $2: variable holding config with fields
 exec_configured_plugins() {
   local action="$1"
 
   debug "execute configured plugins for action $action"
-  local order=cat
+  local order=
   if [ "$action" == "delete" ]; then
-    order=tac
+    order="| reverse"
   fi
-  while IFS="" read -r line; do
-    eval args=( $line )
-    if [ -n "${args[0]}" ]; then
-      if _is_function "${args[0]}"; then
-        (
-          if [ "${opts[plugin]}" = "${args[0]}" ]; then
-            export TRACE=X
-          fi
-          "${args[0]}" "$action" "${args[@]:1}"
-        )
+  export SETTINGSJSON="${!2}"
+
+  local plugins=( )
+  getPluginList plugins "plugins $order" "$2"
+  for p in "${plugins[@]}"; do
+    local name
+    local config
+    local args=( )
+    getValue name name p
+    getValue config config p
+    getValueList args args p
+    
+    export PLUGINCONFIGJSON="$config"
+
+    if [ -n "$name" ]; then
+      if _is_function "${name}"; then
+        exec_plugin "${name}" "${name}" "$action" "${args[@]}"
       else
          local plugin
-         plugin="$(lookupPlugin "${args[0]}")"
+         plugin="$(lookupPlugin "${name}")"
          if [ -n "$plugin" ]; then
-            if [ "${opts[plugin]}" = "${args[0]}" ]; then
-              (
-                export TRACE=X
-                "$plugin" "$action" "${args[@]:1}"
-              )
-            else
-              "$plugin" "$action" "${args[@]:1}"
-            fi
+            exec_plugin "${name}" "$plugin" "$action" "${args[@]}"
          else
-           fail "no action function or plugin with name '${args[0]}' found"
+           fail "no action function or plugin with name '${name}' found"
          fi
       fi
     fi
-  done <<<"$(_jq_get_labeled_arg_list .plugins <<<"${!2}" | $order)"
+  done
 }
 
 handle_exports()

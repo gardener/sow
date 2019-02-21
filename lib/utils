@@ -207,6 +207,49 @@ _jq_get_labeled_arg_list()
 }
 
 #
+# extract a sequence of plugin specs
+# - plugin
+# - plugin: arg
+# - plugin:
+#   - arg1
+#   - arg2
+# - plugin:
+#     config: ...
+#     args: 
+#       - arg1
+#       - arg2
+# result: sequence of "<arg1>" .. "<argn>" tupels
+#
+_jq_get_plugin_list_for_shell()
+{
+  jq -r '('"$1"' // empty) | [
+       if type == "array" then
+          .[] 
+       elif type == "object" then
+         .
+       else
+         . 
+       end | if type == "array" then 
+               if ( . | length) == 0 then
+                 error("empty list not supported as plugin spec")
+               else
+                 { name: .[0], args: .[1:] }
+               end
+             elif type == "object" then
+               . as $p | keys[] | . as $n | $p[.] | if type == "array" then
+                 { name: $n, args: . }
+               elif type == "object" then
+                 { name: $n } + .
+               else
+                 { name: $n, args: [.] }
+               end
+             else
+               { name: ., args: [] }
+             end | tojson ] | @sh'
+}
+
+
+#
 # get a json field mapped to a string mapping
 _get_labeled_value_list()
 {
@@ -368,9 +411,10 @@ getJSONList() {
   _get_json_list "$@"
 }
 
-getJSONList() {
+getPluginList() {
   local v
-  _get_json_list "$@"
+  __get _jq_get_plugin_list_for_shell "${@:2}"
+  eval $1="( $v )"
 }
 
 ################################################################################
