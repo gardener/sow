@@ -15,7 +15,7 @@ RUN curl -L -o spiff-archive.zip https://github.com/mandelsoft/spiff/releases/do
     && unzip -d spiff-extract spiff-archive.zip \
     && cp "spiff-extract/spiff++" /usr/bin/spiff \
     && rm -rf spiff-archive.zip spiff-extract
-RUN git clone https://github.com/mandelsoft/sow.git
+COPY . /sow
 RUN chmod +x /usr/bin/*
-ENV PATH=$PATH:$PWD/sow/bin
+ENV PATH=$PATH:/sow/bin
 ENTRYPOINT ["sow"]
