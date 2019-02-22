@@ -203,11 +203,34 @@ The effective deployment configuration is stored in the `gen` below the
 component folder.
 
 It should contain a `plugins` node listing the plugins that should be executed.
-A plugin entry may take additional string arguments.
+A plugin entry may take additional string arguments and a configuration.
 
-By convention, the first argument describes the path of the yaml node that
+```yaml
+plugins:
+  - echo: "deploying a secret"
+  - kubectl:
+      config: # <yaml config for kubectl plugin>
+        kubeconfig: (( landscape.cluster.kubeconfig ))
+        manifests:
+          - apiVersion: v1
+            kind: Secret
+            ...
+  - echo:
+     - "Happy"
+     - "sowing"
+  - echo:    # this is the complete form for specifying a plugin
+     config: 
+     path: echo
+     args:
+       - "Happy"
+       - "sowing"
+```
+
+By convention, if arguments are used andthe plugin requires a configuration
+the first argument describes the path of the yaml node that
 contains the configuration for the plugin call. By default a plugin
-should assume its name as path.
+should assume its name as path. The better way is to specify the
+configuration directly in the plugin node as described above.
 
 The denoted path should then contain the actual configuration for
 the plugin. This way the same plugin can be called multiple times
@@ -216,12 +239,17 @@ with different settings.
 The execution order is taken from the list order and reversed for the deletion
 of a component.
 
+If a `path` is given it is used as sub folder to store information
+for the actual plugin execution, to separate multiple occurrences
+of a plugin in the plugin list. By default the plugin name should be
+used as `dir`
+
 #### `state.yaml`
 
 This file should describe the information that should be kept
 for subsequent executions
 
-It uses the `deployment.yaml`and all the stubs used for its processing as
+It uses the `deployment.yaml` and all the stubs used for its processing as
 stub.
 
 #### `export.yaml`
@@ -252,6 +280,7 @@ The following sub commands are supported:
 - `show`: show meta data of given components
 - `info`: show info about actual position in filesystem
 - `version`: show tool version
+- `generate`: generate manifests without action execution 
 - `order`: show order of components and/or their deploy or deletion order
 
 The command supports the following options:
@@ -262,3 +291,68 @@ The command supports the following options:
 - `-A`: `deploy`and `delete` work on all active components
 - `-x`: enables trace mode
 - `-v`: enables verbose mode
+
+### Plugins
+
+Plugins are used to exeutes the real installation work.
+There are several plugins delivered with the tool, but an installation
+source or even a single component might provide own or replace existing plugins.
+
+#### API
+
+A plugin is just an executable or shell script. The provides plugins are all shell
+scripts.
+
+There is a combined environment and command line interface for the execution
+of plusings.
+
+In the environment environment variables are provided for a dedicated 
+execution:
+
+- `SETTINGSJSON`: The manifest the plugin execution is taken from
+- `PLUGINCONFIGJSON`: The configuration configured in the plugin specification
+                      in the above manifest
+- `PLUGININSTANCE`: The configured plugin instance name/path
+
+- `GENDIR`: The place to store temporary file for the component
+- `STATEDIR`: The place to store persistent (state relevant) files for the component
+- `EXPORTDIR`: The place to store files intended for reuse by other components.
+- `SOWLIB`: Library path for shell libraries offered by _sow_.
+
+Using a complete plugin call specification (using the config/args) field
+the first variable should never be used.
+If only the arguments are used in the plugin call specification and the
+plugin requires further configuration, it should be taken from
+the `SETTINGSJSON`
+
+If the plugin call specification givens the `path` field it is passed in the
+`PLUGININSTANCE` variable. 
+This should be used as sub folder path for instance specific data stored below
+`GENDIR`, `STATEDIR` or `EXPORTDIR`, to separate different usages of the same
+plugin in a component.
+
+If no config is given, but required by the plugin this value should also be used
+to lookup the config in the `SETTINGSJSON`. It it is not given
+a convention here is to specify the path of the configuration field
+as argument, defaulted by the plugin name.
+
+#### Shell scripts as plugins
+
+If a plugin is implemented by a shell script, there is a library that handles
+the contract described above. It can be used by
+
+```sh
+source "$SOWLIB/pluginutils"
+```
+
+It always provides the `PLUGINCONFIGJSON` and `PLUGININSTANCE`variables and feeds
+their values according the actual settings and conventions. It also sets
+the variables
+
+- `dir`: GENDIR location for the execution
+- `state`: STATEDIR location for the execution
+
+and assures their existence.
+
+Additionally it loads the standard utils library from the _sow_ tool, that
+offers functios for (colored) output and json access (see [lib/utils](lib/utils)).

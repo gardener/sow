@@ -1,8 +1,41 @@
+
+
+PLUGIN="$(dirname "${BASH_SOURCE[1]}")"
+PLUGINNAME="$(cd "$PLUGIN"; basename "$(pwd)")"
+
+CMDLINE="$0 $*"
+
 source "$SOWLIB/utils"
 
-plugin="$(cd "$(dirname "${BASH_SOURCE[1]}")"; basename "$(pwd)")"
-field_path="${2:-$plugin}"
+trap handle_error ERR EXIT
 
-dir="$GENDIR/$field_path"
-state="$STATEDIR/$field_path"
+handle_error()
+{
+  x=$?
+  if [ "$BASH_SUBSHELL" = "0"  ]; then
+    if [ $x -ne 0 -a -n "$STACKTRACE" -a \( -z "$INTENDED_EXIT" -o -n "$DEBUG" \) ]; then
+        print_stacktrace 1 "$CMDLINE"
+    fi
+    INTENDED_EXIT=X
+    DEBUG=
+  fi
+}
+
+
+  
+if [ -z "$PLUGININSTANCE" ]; then
+  PLUGININSTANCE="${2:-$PLUGINNAME}"
+fi
+
+if [ -z "$PLUGINCONFIGJSON" ]; then
+  found "getting config from settings field $PLUGININSTANCE"
+  getJSON PLUGINCONFIGJSON "$PLUGININSTANCE" SETTINGSJSON
+  export PLUGINCONFIGJSON
+fi
+
+
+dir="$GENDIR/$PLUGININSTANCE"
+state="$STATEDIR/$PLUGININSTANCE"
 mkdir -p "$dir" "$state"
+
+found "using path $PLUGININSTANCE"

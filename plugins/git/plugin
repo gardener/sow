@@ -2,17 +2,17 @@
 
 source "$SOWLIB/pluginutils"
 
-getRequiredValue repo "$field_path.repo" DEPLOYMENTJSON
-getValue tag "$field_path.tag" DEPLOYMENTJSON
-getValue branch "$field_path.branch" DEPLOYMENTJSON
-getValueList files "$field_path.files" DEPLOYMENTJSON
+getRequiredValue repo "repo" PLUGINCONFIGJSON
+getValue tag "tag" PLUGINCONFIGJSON
+getValue branch "branch" PLUGINCONFIGJSON
+getValueList files "files" PLUGINCONFIGJSON
 
 if [ -z "$tag$branch" ]; then
-    fail "either 'tag' or 'branch' attribute is required for field $1"
+    fail "either 'tag' or 'branch' attribute is required"
 fi
 if [ -n "$tag" ]; then
     if [ -n "$branch" ]; then
-        fail "only 'tag' or 'branch' attribute should be given for field $1"
+        fail "only 'tag' or 'branch' attribute should be given"
     fi
     # tag is given
     prefix="refs/tags/"

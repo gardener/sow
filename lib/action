@@ -83,6 +83,7 @@ ACTION_execute()
 
   #
   # evaluate component.yaml
+  #  component:
   #    imports:   # list of optionally labelled imported components
   #    stubs:     # list of additional stub file for deployment processing
   #
@@ -110,7 +111,7 @@ ACTION_execute()
               if [ ! -f "$EXPORT/$imp/export.yaml" ]; then
                   fail "imported $nCOMPONENT $imp not deployed yet"
               fi
-              setjsonjson imports "imports.$(echo "$a")" "$(cat "$EXPORT/$imp/export.yaml" | spiff merge --json - || fail "processing imports")"
+              setjsonjson imports "imports.$(echo "$a")" "$(cat "$EXPORT/$imp/export.yaml" | spiff merge --json - || fail "processing import for $imp")"
           fi
       done
       echo "$imports" | jq . > "$GENDIR/import.json"
@@ -187,8 +188,9 @@ ACTION_execute()
 # $2: executable
 # $3: action
 # $4...: args
-exec_plugin()
+_exec_plugin()
 {
+  title "Plugin: $1 ($2)"
   if [ "${opts[plugin]}" = "${1}" ]; then
     (
       export TRACE=X
@@ -196,6 +198,48 @@ exec_plugin()
     )
   else
     "${@:2}"
+  fi
+}
+
+# $1: action
+# $2: spec json
+# $3: variable holding config plugin is takem from (DEPLOYMENT or COMPONENT)
+exec_plugin()
+{
+  local action="$1"
+  local spec="$2"
+  local name
+  local dir
+  local config
+  local args=( )
+  getValue name name spec
+  getValue dir path spec
+  getJSON config config spec
+  getValueList args args spec
+  
+  export SETTINGSJSON="${!3}"
+  export PLUGINCONFIGJSON="$config"
+   
+  local plugin_opts=( )
+  if [ -n "$dir" ]; then
+     PLUGININSTANCE="$dir"
+  else
+     PLUGININSTANCE=
+  fi
+  export PLUGININSTANCE
+
+  if [ -n "$name" ]; then
+    if _is_function "${name}"; then
+        _exec_plugin "${name}" "${name}" "${plugin_opts[@]}" "$action" "${args[@]}"
+    else
+       local plugin
+       plugin="$(lookupPlugin "${name}")"
+       if [ -n "$plugin" ]; then
+          _exec_plugin "${name}" "$plugin" "${plugin_opts[@]}" "$action" "${args[@]}"
+       else
+         fail "no action function or plugin with name '${name}' found"
+       fi
+    fi
   fi
 }
 
@@ -209,33 +253,10 @@ exec_configured_plugins() {
   if [ "$action" == "delete" ]; then
     order="| reverse"
   fi
-  export SETTINGSJSON="${!2}"
-
   local plugins=( )
   getPluginList plugins "plugins $order" "$2"
   for p in "${plugins[@]}"; do
-    local name
-    local config
-    local args=( )
-    getValue name name p
-    getValue config config p
-    getValueList args args p
-    
-    export PLUGINCONFIGJSON="$config"
-
-    if [ -n "$name" ]; then
-      if _is_function "${name}"; then
-        exec_plugin "${name}" "${name}" "$action" "${args[@]}"
-      else
-         local plugin
-         plugin="$(lookupPlugin "${name}")"
-         if [ -n "$plugin" ]; then
-            exec_plugin "${name}" "$plugin" "$action" "${args[@]}"
-         else
-           fail "no action function or plugin with name '${name}' found"
-         fi
-      fi
-    fi
+    exec_plugin "$1" "$p" "$2"
   done
 }
 

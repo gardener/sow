@@ -38,7 +38,7 @@ help()
   found "    -A          use all $nCOMPONENTS if no one is specified"
   found "    -v          verbose mode"
   found "    -t          trace mode"
-  found "    -P <plugin> trace mode for given plugin"
+  found "    -X <plugin> trace mode for given plugin"
   found "    -D          debug mode"
   found "    --version   show version"
   echo
@@ -66,7 +66,7 @@ source "$SOWLIB/opts"
 
 declare -A opts=( )
 declare -A params
-params=( [a]=all [A]=All [v]=verbose [version]="" [dryrun]="" [x]=trace [D]=debug [p]="=$nPRODUCT" [terms]="=" [layout]="=" [P]="=plugin" [S]=stacktrace )
+params=( [a]=all [A]=All [v]=verbose [version]="" [dryrun]="" [x]=trace [D]=debug [p]="=$nPRODUCT" [terms]="=" [layout]="=" [X]="=plugin" [S]=stacktrace )
 OPT_parse_options params opts "$@"
 shift $(( _cnt - 1 ))
 
@@ -560,14 +560,14 @@ execClosure()
   if [ $# -ne 1 ]; then
     resolveComponents "${@:2}"
   else
-    if [ -z "$COMPONENT" ]; then
-      if [ ${opts[All]+set} ]; then
-        comps=( )
-      else
-        fail "not in a $nCOMPONENT"
-      fi
+    if [ ${opts[All]+set} ]; then
+      comps=( )
     else
-      comps=( "$COMPONENT" )
+      if [ -z "$COMPONENT" ]; then
+        fail "not in a $nCOMPONENT"
+      else
+        comps=( "$COMPONENT" )
+      fi
     fi
   fi
 

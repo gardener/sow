@@ -10,7 +10,7 @@ K8S_setKubeConfig()
         target="$GENDIR/$2"
     fi
   fi
-  getValueOrJSON DEFKUBE "$1.kubeconfig" DEPLOYMENTJSON
+  getValueOrJSON DEFKUBE "kubeconfig" PLUGINCONFIGJSON
   if [ ${#DEFKUBE[@]} -eq 0 ]; then
     fail "no kubeconfig configured for $1"
   fi
@@ -22,10 +22,10 @@ K8S_setKubeConfig()
       kubeconfig="${DEFKUBE[1]}"
     fi
     cp "$kubeconfig" "$target"
-    echo "    using $kubeconfig"
+    found "    using $kubeconfig"
   else
     echo "${DEFKUBE[1]}" > "$target"
-    echo "    using inline kubeconfig"
+    found "    using inline kubeconfig"
   fi
   export KUBECONFIG="$target"
 }
@@ -51,11 +51,11 @@ K8S_checkpod() {
     fi
     pods="$(K8S_lookuppod "$@")"
     if [ -n "$pods" ]; then
-        echo "found $name"
-        echo "$pods"
+        found "found $name"
+        found "$pods"
     else
         missing=x
-        echo "no $name found"
+        info "no $name found"
     fi
 }
 
@@ -63,7 +63,7 @@ K8S_assurepods() {
     $1
     if [ -n "$missing" ]; then
         $2
-    echo "waiting for pods"
+    info "waiting for pods"
     while [ -n "$missing" ]; do
         sleep 10
         missing=

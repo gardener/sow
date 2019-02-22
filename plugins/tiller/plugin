@@ -7,11 +7,11 @@ helminit() {
     helm init --service-account=tiller
 }
 
-K8S_setKubeConfig "$field_path" "$dir/kubeconfig"
+K8S_setKubeConfig "$PLUGININSTANCE" "$dir/kubeconfig"
 
 case $1 in
-deploy) K8S_assurepods "K8S_checkpod -d kube-system tiller-deploy" "helminit";;
-delete) kubectl -n kube-system delete deployment tiller-deploy || true;;
-*) fail "unsupported command $1";;
+  deploy) K8S_assurepods "K8S_checkpod -d kube-system tiller-deploy" "helminit";;
+  delete) kubectl -n kube-system delete deployment tiller-deploy || true;;
+  *) fail "unsupported command $1";;
 esac
 

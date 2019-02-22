@@ -2,8 +2,6 @@
 
 source "$SOWLIB/pluginutils"
 
-PLUGIN="$(dirname "${BASH_SOURCE[0]}")"
-
 manifestdir="$dir/manifests"
 mkdir -p "$manifestdir"
 
@@ -25,7 +23,7 @@ loadHandlers()
 loadHandlers "$PLUGIN" "$CURRENT/lib/kubectl" "$PRODUCTDIR/lib/kubectl"
 
 for h in "${@:3}"; do
-  echo "loading handler $h"
+  found "loading handler $h"
   f="$(lookupFile "$h")"
   if [ -n "$f" ]; then
     source "$f"
@@ -35,8 +33,8 @@ for h in "${@:3}"; do
 done
 
 DEFKUBE=( )
-getValueOrJSON DEFKUBE "$field_path.kubeconfig" DEPLOYMENTJSON
-getJSONList MANIFESTS "$field_path.manifests" DEPLOYMENTJSON
+getValueOrJSON DEFKUBE "$kubeconfig" PLUGINCONFIGJSON
+getJSONList MANIFESTS "$manifests" PLUGINCONFIGJSON
 
 if [ ${#DEFKUBE[@]} -eq 0 ]; then
   DEFKUBE=(value $KUBECONFIG)
@@ -63,10 +61,10 @@ setKubeConfig()
       kubeconfig="$2"
     fi
     cp "$kubeconfig" "$3"
-    echo "    using $kubeconfig"
+    found "    using $kubeconfig"
   else
     echo "$2" > "$3"
-    echo "    using inline kubeconfig"
+    found "    using inline kubeconfig"
   fi
 }
 
@@ -108,6 +106,7 @@ exec_action()
   fi
   local f="action_${1}_${kind}_${group//\./_}"
   if _is_function "$f"; then
+    found "    using handler $f"
     $f "$name" "$namespace" "$2" "$3"
   else
     case "$1" in
@@ -134,10 +133,10 @@ exec_manifest()
 
   local base
   if [ -n "$namespace" ]; then
-    echo "manifest for $kind($apiversion): $namespace/$name"
+    found "manifest for $kind($apiversion): $namespace/$name"
     base="$manifestdir/$index-$kind.$namespace.$name"
   else
-    echo "manifest for $kind($apiversion): $name"
+    found "manifest for $kind($apiversion): $name"
     base="$manifestdir/$index-$kind.$name"
   fi
 
@@ -176,9 +175,9 @@ cleanup_deployments()
     local cur=( ${executed[$api]} )
     getValue kubeconfig 'clusters["'"$api"'"].kubeconfig' deployed
     echo "$kubeconfig" >"$TMP_KUBECONFIG"
-    echo "cluster $api"
-    echo "  found deployed objects: ${#keys[@]}"
-    echo "  found currect objects: ${#cur[@]}"
+    info "cluster $api"
+    found "  found deployed objects: ${#keys[@]}"
+    found "  found currect objects: ${#cur[@]}"
     declare -A obsolete ords names
     local ordered=( )
 
@@ -217,10 +216,10 @@ cleanup_deployments()
     done
 
     if [ ${#ordered[@]} -gt 0 ]; then
-      echo "  found deployed obsolete objects: ${#ordered[@]}"
+      info "  found deployed obsolete objects: ${#ordered[@]}"
       for key in "${ordered[@]}"; do
         echo "${obsolete[$key]}" > "$TMP_MANIFEST"
-        echo "    ${names[$key]}"
+        found "    ${names[$key]}"
         exec_action delete  "$TMP_KUBECONFIG" "$TMP_MANIFEST"
         deljsonkey deployed 'clusters["'"$api"'"].manifests["'"$key"'"]'
       done
@@ -291,7 +290,7 @@ execute_entry()
       fi
       executionLoop "$1" files execute_file
     elif [ ${#args[@]} -ne 0 ]; then
-      echo "command: ${#args[@]}: ${args[@]}"
+      found "command: ${#args[@]}: ${args[@]}"
       if _is_function "cmd_${args[0]}"; then
          "cmd_${args[0]}" "$1" "${args[@]:1}"
       else

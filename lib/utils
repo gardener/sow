@@ -11,6 +11,7 @@ source "$SOWLIB/stdio"
 #
 # print the actual stacktrace
 # $1: number of omitted stack enries
+# $2+ title
 #
 print_stacktrace()
 {
@@ -25,7 +26,7 @@ print_stacktrace()
     i=$((i+1))
   done | (
     _start_color "${COLOR_RED}";
-    echo "*** stack trace "
+    echo "*** stack trace ${@:2}"
     echo "command: $BASH_COMMAND"
     column -t -s "  ";
     _end_color
@@ -236,16 +237,21 @@ _jq_get_plugin_list_for_shell()
                  { name: .[0], args: .[1:] }
                end
              elif type == "object" then
-               . as $p | keys[] | . as $n | $p[.] | if type == "array" then
-                 { name: $n, args: . }
-               elif type == "object" then
-                 { name: $n } + .
+                if has("name") then
+                 .
                else
-                 { name: $n, args: [.] }
+                 . as $p | keys[] | . as $n | $p[.] | if type == "array" then
+                   { name: $n, args: . }
+                 elif type == "object" then
+                   { name: $n } + .
+                 else
+                   { name: $n, args: [.] }
+                 end
                end
              else
                { name: ., args: [] }
-             end | tojson ] | @sh'
+             end | tojson
+     ] | @sh'
 }
 
 
