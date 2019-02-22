@@ -1,3 +1,9 @@
 #!/usr/bin/env bash
 # This is a wrapper for sow that will execute sow using a docker image containing its dependencies
-docker run -v "$PWD":"$PWD" -w "$PWD" "sow" "$@"
+
+# Find parent folder of pwd directly under root
+rdir=${PWD#/}
+rdir="/${rdir%%/*}"
+
+# Docker run
+docker run --mount type=bind,src="$rdir",dst="/mounted$rdir" --workdir "/mounted$PWD" --rm --user "$(id -u):$(id -g)" "sow" "$@"
