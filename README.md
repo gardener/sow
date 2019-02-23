@@ -282,6 +282,7 @@ The following sub commands are supported:
 - `version`: show tool version
 - `generate`: generate manifests without action execution 
 - `order`: show order of components and/or their deploy or deletion order
+- `vi`: lookup or edit component related files in component specific folders
 
 The command supports the following options:
 - `-a`: complete the component list
@@ -291,6 +292,9 @@ The command supports the following options:
 - `-A`: `deploy`and `delete` work on all active components
 - `-x`: enables trace mode
 - `-v`: enables verbose mode
+
+
+`sow help` prints a complete list of commands with sub sub options.
 
 ### Plugins
 
@@ -345,7 +349,7 @@ the contract described above. It can be used by
 source "$SOWLIB/pluginutils"
 ```
 
-It always provides the `PLUGINCONFIGJSON` and `PLUGININSTANCE`variables and feeds
+It always provides the `PLUGINCONFIGJSON` and `PLUGININSTANCE` variables and feeds
 their values according the actual settings and conventions. It also sets
 the variables
 

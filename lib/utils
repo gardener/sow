@@ -223,7 +223,7 @@ _jq_get_labeled_arg_list()
 #
 _jq_get_plugin_list_for_shell()
 {
-  jq -r '('"$1"' // empty) | [
+  jq -r '(('"$1"') // empty) | [
        if type == "array" then
           .[] 
        elif type == "object" then
@@ -251,7 +251,7 @@ _jq_get_plugin_list_for_shell()
              else
                { name: ., args: [] }
              end | tojson
-     ] | @sh'
+     ] '"$2"' | @sh'
 }
 
 
@@ -264,7 +264,7 @@ _get_labeled_value_list()
 
 __get() {
   if [ -n "$3" ]; then
-     v="$(eval echo \"\${"$3"}\" | $1 ".$2")"
+     v="$(echo "${!3}" | $1 ".$2" "${@:4}")"
   else
      v="$($1 ".$2")"
   fi
@@ -581,3 +581,27 @@ getAPIServer()
 if [ -n "$TRACE" ]; then
   set -x
 fi
+
+###################################################################################
+# standard plugin utilities
+###################################################################################
+
+PLUGIN_setup()
+{
+  if [ -z "$PLUGININSTANCE" ]; then
+    PLUGININSTANCE="${1:-${2:-$PLUGINNAME}}"
+  fi
+
+  if [ -z "$PLUGINCONFIGJSON" ]; then
+    found "getting config from settings field $PLUGININSTANCE"
+    getJSON PLUGINCONFIGJSON "$PLUGININSTANCE" SETTINGSJSON
+    export PLUGINCONFIGJSON
+  fi
+
+
+  dir="$GENDIR/$PLUGININSTANCE"
+  state="$STATEDIR/$PLUGININSTANCE"
+  mkdir -p "$dir" "$state"
+
+  found "using path $PLUGININSTANCE"
+}

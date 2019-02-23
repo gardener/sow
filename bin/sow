@@ -58,6 +58,15 @@ help()
   found "    -s          also the state step"
   found "    -e          also the export step"
   info "  add {<components>}            create a frame for a new component"
+  info "  vi [-cLegsprl] {<file>}         lookup and edit file"
+  found "    -c <comp>   component different from current"
+  found "    -L          only list paths"
+  found "    -e          export dir"
+  found "    -s          state dir"
+  found "    -g          gen dir"
+  found "    -p          $nPRODUCT dir"
+  found "    -r          landscape dir"
+  found "    -l          local componet"
 }
 
 source "$SOWLIB/utils"
@@ -117,6 +126,21 @@ jsonAddString()
   else
     jsonAdd "$1" "\"$2\""
   fi
+}
+
+componentStub()
+{
+  local __stub
+  jsonAddString __stub "<<" "(( &temporary ))"
+  jsonAddString __stub ROOTDIR "$ROOT"
+  jsonAddString __stub ROOTPRODUCTDIR "$ROOTPRODUCTDIR"
+  jsonAddString __stub PRODUCT "$PRODUCT"
+  jsonAddString __stub PRODUCTDIR "$PRODUCTDIR"
+  jsonAddString __stub COMPONENT "$COMPONENT"
+  jsonAddString __stub GENDIR "$GENDIR"
+  jsonAddString __stub STATEDIR "$STATEDIR"
+  jsonAddString __stub EXPORTDIR "$EXPORTDIR"
+  jsonAdd $1 "env" "{ $__stub }"
 }
 
 setupProductMeta()
@@ -292,6 +316,9 @@ showComponent()
   for i in "${usedby[@]}"; do
     found "     - $i"
   done
+  info "     gendir: $GEN/$c"
+  info "     exportdir: $EXPORT/$c"
+  info "     statedir: $STATE/$c"
   ( # should be part of the landscape meta data, later on
     CURRENT="$ROOT/${COMPONENTS[$c]}"
     setComponent "$CURRENT"
@@ -604,6 +631,62 @@ resolveComponents()
   done
 }
 
+CMD_edit()
+{
+  CMD_vi "$@"
+}
+
+CMD_vi()
+{
+  declare -A params
+  params=( [c]="=component" [e]=export [s]=state [g]=gen [l]=local [r]=root [p]=product [L]=)
+  OPT_parse_options params opts "$@"
+  shift $(( _cnt - 1 ))
+
+  local comp="${opts[component]}"
+  if [ -z "$comp" ]; then
+    if [ -z "$COMPONENT" ]; then
+      fail "no $nCOMPONENT specified"
+    fi
+    comp="$COMPONENT"
+  fi
+
+
+  (
+    if [ -z "$EDITOR" ]; then
+      EDITOR=vi
+    fi
+    ACTION_setup "$comp"
+
+    local search=( )
+    for o in "${!opts[@]}"; do
+      case "$o" in
+        export)     search=( "${search[@]}" "$EXPORTDIR" );;
+        state)      search=( "${search[@]}" "$STATEDIR" );;
+        gen)        search=( "${search[@]}" "$GENDIR" );;
+        local)      search=( "${search[@]}" "$CURRENT" );;
+        root)       search=( "${search[@]}" "$ROOT" );;
+        product)    search=( "${search[@]}" "$PRODUCTDIR" );;
+      esac
+    done
+    if [ ${#search[@]} -eq 0 ]; then
+      search=( "$PRODUCTROOT" "$ROOTPRODUCTDIR" "$GENDIR" "$STATEDIR" "$EXPORTDIR" )
+    fi
+
+    for f in "$@"; do
+      file="$(lookupFileIn "$f" "${search[@]}" )"
+      if [ -z "$file" ]; then
+        fail "$f not found for $nCOMPONENT $comp"
+      fi
+      if [ "${opts[L]+set}" ]; then
+         echo "$file"
+      else
+        "$EDITOR" "$file"
+      fi
+    done
+  )
+}
+
 CMD_add()
 {
   local productdir="$PRODUCTDIR"
@@ -711,7 +794,7 @@ source "$SOWLIB/cmd"
 source "$SOWLIB/action"
 
 
-CMDS=( deploy delete info show help version add generate )
+CMDS=( deploy delete info show help vi version add generate )
 cmd="$(CMDS_resolve_shortcut "$1" "${CMDS[@]}")"
 
 verbose "$nLANDSCAPE = $ROOT"

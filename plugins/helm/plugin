@@ -3,7 +3,6 @@
 source "$SOWLIB/pluginutils"
 source "$SOWLIB/k8s"
 
-command="${3:-"upgrade"}"
 
 K8S_setKubeConfig "$PLUGININSTANCE" "$dir/kubeconfig"
 
@@ -17,7 +16,7 @@ getValueList helm_flags_deploy "flags.deploy" PLUGINCONFIGJSON
 getValueList helm_flags_delete "flags.delete" PLUGINCONFIGJSON
 
 if [ -z "$command" ]; then
-  command="upgrade"
+  command="${3:-"upgrade"}"
 fi
 
 # Writes from stdin to file
@@ -55,6 +54,7 @@ esac
 deploy() {
     info "Running helm $command for $name ..."
     exec_cmd helm $command $flags $name \
+        --kubeconfig "$KUBECONFIG" \
         --values "$dir/values.json" \
         --namespace $namespace \
         $(echo "${helm_flags_deploy[@]}") \
@@ -67,6 +67,7 @@ delete() {
         info "Deleting helm deployment for $name"
         tmp="/tmp/helmplugin$$"
         exec_cmd helm delete \
+            --kubeconfig "$KUBECONFIG" \
             --purge \
             $name \
             $(echo "${helm_flags_delete[@]}") 2>"$tmp" || {

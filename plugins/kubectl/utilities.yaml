@@ -1,11 +1,42 @@
+env:
+
 utilities:
   <<: (( &temporary(merge || ~) ))
   kubectl:
      templates:
+       kubectl_get:
+        - <<: (( &template ))
+        - kubectl
+        - "--kubeconfig"
+        - (( lookup_file(k,_.env.ROOTDIR).[0] || tempfile(k) ))
+        - "-n"
+        - (( landscape.namespace ))
+        - get
+        - (( t ))
+        - (( o ))
+        - "-o"
+        - "yaml"
+       kubectl_getfield:
+        - <<: (( &template ))
+        - kubectl
+        - "--kubeconfig"
+        - (( lookup_file(k,_.env.ROOTDIR).[0] || tempfile(k) ))
+        - "-n"
+        - (( landscape.namespace ))
+        - get
+        - (( t ))
+        - (( o ))
+        - "-o"
+        - (( "jsonpath=" p "" ))
+
        kubectl:
          <<: (( &template ))
          kubeconfig: (( config ))
          manifests: (( read(file, "importmulti") ))
          values: (( &temporary(settings) ))
 
-     generate: (( lambda |file,config,settings|->*utilities.kubectl.templates.kubectl ))
+     generate: (( lambda |file,config,settings|->*_.templates.kubectl ))
+
+     getField: (( |k,t,o,p|->exec(*_.templates.kubectl_getfield) ))
+     get: (( |k,t,o|->exec(*_.templates.kubectl_get) ))
+

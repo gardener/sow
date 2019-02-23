@@ -4,7 +4,7 @@ ACTION_setup()
 {
   CURRENT="${COMPONENTS["$1"]}"
   if [ -z "$CURRENT" ]; then
-    fail "unknoen $nCOMPONENT $1"
+    fail "unknonn $nCOMPONENT $1"
   fi
   COMPONENT="$1"
 
@@ -18,6 +18,10 @@ ACTION_setup()
   export PRODUCTDIR="$ROOT/$PRODUCTDIR"
   export PRODUCT
   export COMPONENT
+
+  export GENDIR="$GEN/$COMPONENT"
+  export STATEDIR="$STATE/$COMPONENT"
+  export EXPORTDIR="$EXPORT/$COMPONENT"
 }
 
 # $1; component
@@ -38,10 +42,6 @@ ACTION_execute()
   ##############################
   # GENERATE COMPONENT FOLDERS #
   ##############################
-
-  export GENDIR="$GEN/$COMPONENT"
-  export STATEDIR="$STATE/$COMPONENT"
-  export EXPORTDIR="$EXPORT/$COMPONENT"
 
   mkdir -p "$STATEDIR" "$GENDIR" "$EXPORTDIR"
 
@@ -147,18 +147,23 @@ ACTION_execute()
   # the plugins are executed in the given order for deployment and
   # in the reverse order for deletion
 
+  local env=""
+  componentStub env
+  echo "$env" >"$GENDIR/env.json"
+
   deploymentstubs=( )
   deployment=
 
   if [ ${#stubs[@]} -ne 0 ]; then
     echo "using stubs ${stubs[@]}"
   fi
+  deploymentstubs=("$CURRENT/$fACTIONDEF" "${stubs[@]}" "$CONFIG" "$GENDIR/import.json")
+  if [ -f "$STATEDIR/state.yaml" ]; then
+      deploymentstubs=("${deploymentstubs[@]}" "$STATEDIR/state.yaml")
+  fi
+  deploymentstubs=("${deploymentstubs[@]}" "$GENDIR/env.json")
+
   if [ -f "$CURRENT/$fACTIONDEF" ]; then
-      if [ -f "$STATEDIR/state.yaml" ]; then
-          deploymentstubs=("$CURRENT/$fACTIONDEF" "${stubs[@]}" "$CONFIG" "$GENDIR/import.json" "$STATEDIR/state.yaml")
-      else
-          deploymentstubs=("$CURRENT/$fACTIONDEF" "${stubs[@]}" "$CONFIG" "$GENDIR/import.json")
-      fi
       deployment="$(spiff merge --json "${deploymentstubs[@]}" || fail "processing $fACTIONDEF")"
   fi
   if [ -z "$deployment" ]; then
@@ -191,14 +196,14 @@ ACTION_execute()
 _exec_plugin()
 {
   title "Plugin: $1 ($2)"
-  if [ "${opts[plugin]}" = "${1}" ]; then
-    (
+  (
+    if [ "${opts[plugin]}" = "${1}" ]; then
       export TRACE=X
       "${@:2}"
-    )
-  else
-    "${@:2}"
-  fi
+    else
+      "${@:2}"
+    fi
+  )
 }
 
 # $1: action
@@ -248,13 +253,13 @@ exec_plugin()
 exec_configured_plugins() {
   local action="$1"
 
-  debug "execute configured plugins for action $action"
+  found "execute configured plugins for action $action"
   local order=
   if [ "$action" == "delete" ]; then
     order="| reverse"
   fi
   local plugins=( )
-  getPluginList plugins "plugins $order" "$2"
+  getPluginList plugins "plugins" "$2" "$order"
   for p in "${plugins[@]}"; do
     exec_plugin "$1" "$p" "$2"
   done
@@ -262,7 +267,7 @@ exec_configured_plugins() {
 
 handle_exports()
 {
-  debug handle export step
+  title "generating exports"
   if [ "$action" != "delete" -a -f "$CURRENT/export.yaml" ]; then
       if [ -f "$STATEDIR/state.yaml" ]; then
           spiff merge "$CURRENT/export.yaml" "${deploymentstubs[@]}" "$STATEDIR/state.yaml" > "$EXPORTDIR/export.yaml" || fail "processing exports"
@@ -297,7 +302,7 @@ restore() {
 
 handle_state()
 {
-  debug handle state step
+  title update state
   if [ -f "$CURRENT/state.yaml" ]; then
       if [ -f "$STATEDIR/state.yaml" ]; then
           cp "$STATEDIR/state.yaml"  "$STATEDIR/state.yaml.bak"

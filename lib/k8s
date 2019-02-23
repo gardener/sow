@@ -39,7 +39,7 @@ K8S_lookuppod() {
     ext=
     if [ "$1" == -d ]; then
         shift
-        ext="-[a-z0-9]{9}"
+        ext="-[a-z0-9]{9,10}"
     fi
     kubectl -n $1 get pods | (egrep "$2$ext-[a-z0-9]{5} " || true) | (grep Running || true)
 }

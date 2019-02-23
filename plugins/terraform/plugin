@@ -4,11 +4,7 @@ source "$SOWLIB/pluginutils"
 
 jq .values <<< "$PLUGINCONFIGJSON" > "$dir/terraform.tfvars"
 
-getValue source soure PLUGINCONFIGJSON
-
-if [ -z "$source" ]; then
-    fail "source attribute required"
-fi
+getRequiredValue source source PLUGINCONFIGJSON
 
 deploy() {
     (

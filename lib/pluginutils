@@ -21,21 +21,4 @@ handle_error()
   fi
 }
 
-
-  
-if [ -z "$PLUGININSTANCE" ]; then
-  PLUGININSTANCE="${2:-$PLUGINNAME}"
-fi
-
-if [ -z "$PLUGINCONFIGJSON" ]; then
-  found "getting config from settings field $PLUGININSTANCE"
-  getJSON PLUGINCONFIGJSON "$PLUGININSTANCE" SETTINGSJSON
-  export PLUGINCONFIGJSON
-fi
-
-
-dir="$GENDIR/$PLUGININSTANCE"
-state="$STATEDIR/$PLUGININSTANCE"
-mkdir -p "$dir" "$state"
-
-found "using path $PLUGININSTANCE"
+PLUGIN_setup "$2"

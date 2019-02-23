@@ -36,10 +36,6 @@ DEFKUBE=( )
 getValueOrJSON DEFKUBE "$kubeconfig" PLUGINCONFIGJSON
 getJSONList MANIFESTS "$manifests" PLUGINCONFIGJSON
 
-if [ ${#DEFKUBE[@]} -eq 0 ]; then
-  DEFKUBE=(value $KUBECONFIG)
-fi
-
 LEN="${#MANIFESTS[@]}"
 
 if [ $LEN -eq 0 ]; then
@@ -53,7 +49,8 @@ cmd_echo()
 
 setKubeConfig()
 {
-  if [ $1 == value ]; then
+  if [ $1 = value ]; then
+    print_stacktrace
     local kubeconfig
     if [[ "$2" != /* ]]; then
       kubeconfig="$ROOT/$2"
@@ -276,6 +273,9 @@ execute_entry()
     kube=( "${DEFKUBE[@]}" )
   else
     nested=X
+  fi
+  if [ ${#kube[@]} -eq 0 -o -z "${kube[1]}" ]; then
+    fail no or empty kubeconfig configured
   fi
 
   getJSONList manifests manifests entry
