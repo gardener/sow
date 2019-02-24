@@ -250,6 +250,10 @@ for the actual plugin execution, to separate multiple occurrences
 of a plugin in the plugin list. By default the plugin name should be
 used as `dir`
 
+If the plugin name start with a `-`, its execution is not notified
+on the output. This can be used for the `echo` plugin to
+echo plain multi line text.
+
 #### `state.yaml`
 
 This file should describe the information that should be kept
@@ -265,6 +269,9 @@ components. By convention it should be stored below an `export` node.
 
 It uses the `deployment.yaml` and all the stubs used for its processing as
 stub. As state the state of the actual execution is used.
+
+If it contains a `files` section the listes files (structure with `path` and
+`data` fields) are written to the components export folder.
 
 #### The Data Flow
 

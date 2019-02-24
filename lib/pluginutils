@@ -7,18 +7,4 @@ CMDLINE="$0 $*"
 
 source "$SOWLIB/utils"
 
-trap handle_error ERR EXIT
-
-handle_error()
-{
-  x=$?
-  if [ "$BASH_SUBSHELL" = "0"  ]; then
-    if [ $x -ne 0 -a -n "$STACKTRACE" -a \( -z "$INTENDED_EXIT" -o -n "$DEBUG" \) ]; then
-        print_stacktrace 1 "$CMDLINE"
-    fi
-    INTENDED_EXIT=X
-    DEBUG=
-  fi
-}
-
 PLUGIN_setup "$2"

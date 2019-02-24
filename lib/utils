@@ -5,6 +5,58 @@ set -e
 source "$SOWLIB/stdio"
 
 ################################################################################
+# standard error handling
+################################################################################
+
+handle_error()
+{
+  x=${1:-$?}
+  if [ -n "$STACKTRACE" ]; then
+    warn "ERRCODE $x (subshell $BASH_SUBSHELL) INTEND=$INTENDED_EXIT"
+  fi
+  if [ -z "$SOWID" -o ! -f "$SOWID" ]; then
+    if [ $x -ne 0 -a -n "$STACKTRACE" -a \( -z "$INTENDED_EXIT" -o -n "$DEBUG" \) ]; then
+        print_stacktrace 1
+        if [ -n "$SOWID" ]; then
+          touch "$SOWID"
+        fi
+    else
+      if [ "$BASH_SUBSHELL" = "0"  ]; then
+        if [ -n "$SOWID" ]; then
+          rm -f "$SOWID"
+        fi
+      fi
+    fi
+    INTENDED_EXIT=X
+    DEBUG=
+  fi
+}
+
+StandardErrorHandling()
+{
+  if [ -n "$STACKTRACE" ]; then
+    color_dark SUBSHELL$BASH_SUBSHELL
+  fi
+  if [ "$BASH_SUBSHELL" = "0" ]; then
+    export "SOWID=/tmp/sowid=$$"
+  fi
+  set -e
+  export INTENDED_EXIT=
+  trap handle_error ERR EXIT
+}
+
+ExecuteInSubshell()
+{
+  (
+    StandardErrorHandling
+    trap handle_error ERR EXIT
+    "$@"
+  )
+}
+
+StandardErrorHandling
+
+################################################################################
 # standard utils
 ################################################################################
 

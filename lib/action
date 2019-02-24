@@ -22,67 +22,60 @@ ACTION_setup()
   export GENDIR="$GEN/$COMPONENT"
   export STATEDIR="$STATE/$COMPONENT"
   export EXPORTDIR="$EXPORT/$COMPONENT"
-}
-
-# $1; component
-# $2: action
-ACTION_execute()
-{
-  (
-
-  ACTION_setup "$2"
-  action="$1"
-  shift 2
-
-  steps=( "$@" )
-  if contains all "${steps[@]}"; then
-    steps=( exec state export )
-  fi
-
-  ##############################
-  # GENERATE COMPONENT FOLDERS #
-  ##############################
-
-  mkdir -p "$STATEDIR" "$GENDIR" "$EXPORTDIR"
-
-  if [ -x "$ROOTPRODUCTDIR/lib/action" ]; then
-    source "$ROOTPRODUCTDIR/lib/action"
-  fi
 
   export CONFIGJSON
   export KUBECONFIG
   export DOMAIN
+  
+  mkdir -p "$STATEDIR" "$GENDIR" "$EXPORTDIR"
+}
+
+# $1; component
+# $2+: action spec
+ACTION_execute()
+{
+  ExecuteInSubshell ___execute "$@"
+}
+
+___execute()
+{
+    ACTION_setup "$1"
+    shift
+    "$@"
+}
+
+#
+# step order
+# - component (always)
+# - deployment
+# - plugins
+# - state
+# - export
+#
+action_deployment()
+{
+  action="$1"
+  shift
+
+  steps=( "$@" )
+  if contains all "${steps[@]}"; then
+    steps=( component prepare deployment plugins state export )
+  fi
+
+  if [ -x "$ROOTPRODUCTDIR/lib/action" ]; then
+    source "$ROOTPRODUCTDIR/lib/action"
+  fi
 
   if [ -f "$CURRENT/action" ]; then
     info "using local action script"
     source "$CURRENT/action"
   fi
 
-  ####################
-  # HELPER FUNCTIONS #
-  ####################
 
-
-  _deploy() {
-    exec_configured_plugins deploy DEPLOYMENTJSON
-    if _is_function "deploy"; then
-       deploy "$@"
-    fi
-  }
-
-  _delete() {
-    if _is_function "delete"; then
-       delete "$@"
-    fi
-    exec_configured_plugins delete DEPLOYMENTJSON
-  }
-
-  ####################
-  # HANDLE COMPONENT #
-  ####################
-
+  ############################
+  # evaluating component.yaml
+  ############################
   #
-  # evaluate component.yaml
   #  component:
   #    imports:   # list of optionally labelled imported components
   #    stubs:     # list of additional stub file for deployment processing
@@ -97,59 +90,59 @@ ACTION_execute()
   #
   # stubs may be paths relative to the component or the garden folder
   #
-  if [ -f "$CURRENT/$fCOMPDEF" ]; then
-      # evaluate imports
-      imports="{}"
-      declare -A import_map
-      getComponentJSON "$CURRENT/$fCOMPDEF"
-      getImports import_map COMPONENTJSON
-      for a in "${!import_map[@]}"; do
-          imp="${import_map[$a]}"
-          # remove leanding and trailing spaces
-          a="$(sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'<<<"$a")"
-          if [ -n "$a" -a -n "$imp" ]; then # clean spaces
-              if [ ! -f "$EXPORT/$imp/export.yaml" ]; then
-                  fail "imported $nCOMPONENT $imp not deployed yet"
-              fi
-              setjsonjson imports "imports.$(echo "$a")" "$(cat "$EXPORT/$imp/export.yaml" | spiff merge --json - || fail "processing import for $imp")"
-          fi
-      done
-      echo "$imports" | jq . > "$GENDIR/import.json"
 
-      # evaluate additional stubs
-      _get_value_list slist component.stubs COMPONENTJSON
-      for i in "${slist[@]}"; do
-        local stub
-        stub="$(lookupStub "$i")"
-        if [ -z "$stub" ]; then
-          fail "stub '$i' not found"
-        fi
-        stubs=( "${stubs[@]}" "$stub" )
-      done
+  if contains component "${steps[@]}";then 
+    if [ -f "$CURRENT/$fCOMPDEF" ]; then
+      found "generating effective component manifest"
+      getComponentJSON "$CURRENT/$fCOMPDEF"
+    else
+      COMPONENTJSON="{}"
+    fi
+    spiff merge - <<<"$COMPONENTJSON" > "$GENDIR/$fCOMPDEF" || fail "saving $fCOMPDEF"
   else
-      COMPONENTJSON="{ }"
-      echo "---" > "$GENDIR/import.json"
-      stubs=( )
+    COMPONENTJSON="$(spiff merge --json "$GENDIR/$fCOMPDEF")"
   fi
   export COMPONENTJSON
 
-  #
-  # plugins:
-  #   - <name>
-  #   - <name>: <arg>
-  #   - <name>:
-  #      - <arg1>
-  #      - <arg2>
-  #   - <name>:
-  #        config: <yaml>   # will be passed in env as PLUGINCONFIGJSON
-  #        args:
-  #          - <arg1>
-  # the plugins are executed in the given order for deployment and
-  # in the reverse order for deletion
+  # evaluate imports
+  imports="{}"
+  declare -A import_map
+  getImports import_map COMPONENTJSON
+  for a in "${!import_map[@]}"; do
+      imp="${import_map[$a]}"
+      # remove leanding and trailing spaces
+      a="$(sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'<<<"$a")"
+      if [ -n "$a" -a -n "$imp" ]; then # clean spaces
+          if [ ! -f "$EXPORT/$imp/export.yaml" ]; then
+              fail "imported $nCOMPONENT $imp not deployed yet"
+          fi
+          setjsonjson imports "imports.$(echo "$a")" "$(cat "$EXPORT/$imp/export.yaml" | spiff merge --json - || fail "processing import for $imp")"
+      fi
+  done
+  echo "$imports" | jq . > "$GENDIR/import.json"
+
+  # evaluate additional stubs
+  _get_value_list slist component.stubs COMPONENTJSON
+  for i in "${slist[@]}"; do
+    local stub
+    stub="$(lookupStub "$i")"
+    if [ -z "$stub" ]; then
+      fail "stub '$i' not found"
+    fi
+    stubs=( "${stubs[@]}" "$stub" )
+  done
+
+  ######################
+  # provide env stub
+  ######################
 
   local env=""
   componentStub env
   echo "$env" >"$GENDIR/env.json"
+
+  ############################
+  # evaluating deployment.yaml
+  ############################
 
   deploymentstubs=( )
   deployment=
@@ -163,19 +156,36 @@ ACTION_execute()
   fi
   deploymentstubs=("${deploymentstubs[@]}" "$GENDIR/env.json")
 
-  if [ -f "$CURRENT/$fACTIONDEF" ]; then
-      deployment="$(spiff merge --json "${deploymentstubs[@]}" || fail "processing $fACTIONDEF")"
-  fi
-  if [ -z "$deployment" ]; then
-    deployment="{}"
-  fi
 
-  export DEPLOYMENTJSON="$deployment"
-  spiff merge - <<<"$deployment" > "$GENDIR/$fACTIONDEF" || fail "saving $fACTIONDEF"
-  if contains exec "${steps[@]}";then 
+  if contains deployment "${steps[@]}";then 
+    found "generating effective deployment manifest"
+    if [ -f "$CURRENT/$fACTIONDEF" ]; then
+        DEPLOYMENTJSON="$(spiff merge --json "${deploymentstubs[@]}" || fail "processing $fACTIONDEF")"
+    fi
+    if [ -z "$DEPLOYMENTJSON" ]; then
+      DEPLOYMENTJSON="{}"
+    fi
+    spiff merge - <<<"$DEPLOYMENTJSON" > "$GENDIR/$fACTIONDEF" || fail "saving $fACTIONDEF"
+  else 
+    DEPLOYMENTJSON="$(spiff merge --json "$GENDIR/$fACTIONDEF")"
+  fi
+  export DEPLOYMENTJSON
+
+  ############################
+  # evaluating deployment.yaml
+  ############################
+
+  if contains plugins "${steps[@]}";then 
+    found "execute configured plugins for action $action"
     case "$action" in
-        (deploy) _deploy "$@";;
-        (delete) _delete "$@";;
+        (deploy)  exec_configured_plugins deploy DEPLOYMENTJSON
+                  if _is_function "deploy"; then
+                     deploy "$@"
+                  fi;;
+        (delete)  if _is_function "delete"; then
+                     delete "$@"
+                  fi
+                  exec_configured_plugins delete DEPLOYMENTJSON;;
         (*) fail "unknown command $action";;
     esac
   fi
@@ -183,10 +193,10 @@ ACTION_execute()
   if contains state "${steps[@]}";then 
     handle_state
   fi
+
   if contains export "${steps[@]}";then 
     handle_exports
   fi
-  )
 }
 
 # $1: name
@@ -195,7 +205,9 @@ ACTION_execute()
 # $4...: args
 _exec_plugin()
 {
-  title "Plugin: $1 ($2)"
+  if [ -z "$hide" ]; then
+    title "Plugin: $1 ($2)"
+  fi
   (
     if [ "${opts[plugin]}" = "${1}" ]; then
       export TRACE=X
@@ -233,7 +245,12 @@ exec_plugin()
   fi
   export PLUGININSTANCE
 
+  local hide=
   if [ -n "$name" ]; then
+    if [[ "$name" = -* ]]; then
+      name="${name#-}" 
+      hide=x
+    fi
     if _is_function "${name}"; then
         _exec_plugin "${name}" "${name}" "${plugin_opts[@]}" "$action" "${args[@]}"
     else
@@ -248,12 +265,25 @@ exec_plugin()
   fi
 }
 
+
 # $1: action
 # $2: variable holding config with fields
+#
+# plugins:
+#   - <name>
+#   - <name>: <arg>
+#   - <name>:
+#      - <arg1>
+#      - <arg2>
+#   - <name>:
+#        config: <yaml>   # will be passed in env as PLUGINCONFIGJSON
+#        args:
+#          - <arg1>
+# the plugins are executed in the given order for deployment and
+# in the reverse order for deletion
 exec_configured_plugins() {
   local action="$1"
 
-  found "execute configured plugins for action $action"
   local order=
   if [ "$action" == "delete" ]; then
     order="| reverse"

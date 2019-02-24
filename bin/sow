@@ -6,22 +6,6 @@ SOW="$(cd "$(dirname "${BASH_SOURCE[0]}")/.."; echo "$PWD" )"
 SOWLIB="$SOW/lib"
 TOOL="$(basename "$0")"
 
-set -e 
-
-trap handle_error ERR EXIT
-
-handle_error()
-{
-  x=$?
-  if [ "$BASH_SUBSHELL" = "0"  ]; then
-    if [ $x -ne 0 -a -n "$STACKTRACE" -a \( -z "$INTENDED_EXIT" -o -n "$DEBUG" \) ]; then
-        print_stacktrace 1
-    fi
-    INTENDED_EXIT=X
-    DEBUG=
-  fi
-}
-
 get_version()
 {
   echo "$nTOOL version $VERSION"
@@ -463,17 +447,15 @@ _CMD_show()
 
 CMD_generate()
 {
-  declare -A params=( [e]=exports [s]=state )
+  declare -A params=( [c]=component [d]=deployment [p]=plugins [e]=export [s]=state )
   declare -A opts=( )
   OPT_parse_options params opts "$@"
   shift $(( _cnt - 1 ))
 
-  steps=( deployment )
-  if [ ${opts[state]+set} ]; then
-    steps=( "${steps[@]}" state )
-  fi
-  if [ ${opts[exports]+set} ]; then
-    steps=( "${steps[@]}" export )
+  steps=( "${!opts[@]}" )
+
+  if [ ${#steps[@]} -eq 0 ]; then
+    steps=( component prepare deployment )
   fi
 
   execClosure _CMD_generate "$@"
@@ -482,10 +464,11 @@ CMD_generate()
 _CMD_generate()
 {
   for c in "$@"; do
-    confirm "*****************************"
+    confirm "**************************************************************"
     confirm "*** generating [$(join ", " "${steps[@]}")] for $nCOMPONENT $c"
-    ACTION_execute deploy "$c" "${steps[@]}"
+    ACTION_execute "$c" action_deployment none "${steps[@]}"
     confirm "*** $nCOMPONENT $c done"
+    confirm "**************************************************************"
   done
 }
 
@@ -506,7 +489,7 @@ _CMD_deploy()
   for c in "$@"; do
     confirm "*****************************"
     confirm "*** ${nTOOL}ing $nCOMPONENT $c"
-    ACTION_execute deploy "$c" all
+    ACTION_execute "$c" action_deployment deploy  all
     confirm "*** $nCOMPONENT $c deployed"
   done
 }
@@ -528,7 +511,7 @@ _CMD_delete()
   for c in "$@"; do
     confirm "*****************************"
     confirm "*** deleting $nCOMPONENT $c"
-    ACTION_execute delete "$c" all
+    ACTION_execute "$c" action_deployment delete all
     confirm "*** $nCOMPONENT $c deleted"
   done
 }
@@ -651,40 +634,41 @@ CMD_vi()
     comp="$COMPONENT"
   fi
 
+  ACTION_execute "$comp" action_edit "$@"
+}
 
-  (
-    if [ -z "$EDITOR" ]; then
-      EDITOR=vi
+action_edit()
+{
+  if [ -z "$EDITOR" ]; then
+    EDITOR=vi
+  fi
+
+  local search=( )
+  for o in "${!opts[@]}"; do
+    case "$o" in
+      export)     search=( "${search[@]}" "$EXPORTDIR" );;
+      state)      search=( "${search[@]}" "$STATEDIR" );;
+      gen)        search=( "${search[@]}" "$GENDIR" );;
+      local)      search=( "${search[@]}" "$CURRENT" );;
+      root)       search=( "${search[@]}" "$ROOT" );;
+      product)    search=( "${search[@]}" "$PRODUCTDIR" );;
+    esac
+  done
+  if [ ${#search[@]} -eq 0 ]; then
+    search=( "$PRODUCTROOT" "$ROOTPRODUCTDIR" "$GENDIR" "$STATEDIR" "$EXPORTDIR" )
+  fi
+
+  for f in "$@"; do
+    file="$(lookupFileIn "$f" "${search[@]}" )"
+    if [ -z "$file" ]; then
+      fail "$f not found for $nCOMPONENT $comp"
     fi
-    ACTION_setup "$comp"
-
-    local search=( )
-    for o in "${!opts[@]}"; do
-      case "$o" in
-        export)     search=( "${search[@]}" "$EXPORTDIR" );;
-        state)      search=( "${search[@]}" "$STATEDIR" );;
-        gen)        search=( "${search[@]}" "$GENDIR" );;
-        local)      search=( "${search[@]}" "$CURRENT" );;
-        root)       search=( "${search[@]}" "$ROOT" );;
-        product)    search=( "${search[@]}" "$PRODUCTDIR" );;
-      esac
-    done
-    if [ ${#search[@]} -eq 0 ]; then
-      search=( "$PRODUCTROOT" "$ROOTPRODUCTDIR" "$GENDIR" "$STATEDIR" "$EXPORTDIR" )
+    if [ "${opts[L]+set}" ]; then
+       echo "$file"
+    else
+      "$EDITOR" "$file"
     fi
-
-    for f in "$@"; do
-      file="$(lookupFileIn "$f" "${search[@]}" )"
-      if [ -z "$file" ]; then
-        fail "$f not found for $nCOMPONENT $comp"
-      fi
-      if [ "${opts[L]+set}" ]; then
-         echo "$file"
-      else
-        "$EDITOR" "$file"
-      fi
-    done
-  )
+  done
 }
 
 CMD_add()
