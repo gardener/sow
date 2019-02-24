@@ -272,11 +272,7 @@ handle_exports()
       if [ -f "$STATEDIR/state.yaml" ]; then
           spiff merge "$CURRENT/export.yaml" "${deploymentstubs[@]}" "$STATEDIR/state.yaml" > "$EXPORTDIR/export.yaml" || fail "processing exports"
       else
-          if [ -n "$DEPLOYMENTJSON" ]; then
-              echo "$DEPLOYMENTJSON" | spiff merge "$CURRENT/export.yaml" - > "$EXPORTDIR/export.yaml" || fail "processing exports"
-          else
-              spiff merge "$CURRENT/export.yaml" > "$EXPORTDIR/export.yaml" || fail "processing exports"
-          fi
+          spiff merge "$CURRENT/export.yaml" "${deploymentstubs[@]}" > "$EXPORTDIR/export.yaml" || fail "processing exports"
       fi
 
       EXPORTJSON="$(spiff merge --json "$EXPORTDIR/export.yaml" || fail "reading exports")"

@@ -32,6 +32,12 @@ Therefore _Sow_ processes the yaml documents with the
 by providing appropriate merge stubs based on
 the exports of the dependencies and the last local state.
 
+<p align="center">
+
+![Overview](doc/sow1.png)
+
+</p>
+
 The dependencies are also used to determine the appropriate 
 deployment and deletion order for the components of
 an installation source.
@@ -134,7 +140,7 @@ a kubernetes cluster.
 
 #### `acre.yaml`
 
-This file may contain any configuration informatio in any 
+This file may contain any configuration information in any 
 structure required by the installation source.
 
 A convention is to use a node `landscape` to hold the
@@ -260,6 +266,42 @@ components. By convention it should be stored below an `export` node.
 It uses the `deployment.yaml` and all the stubs used for its processing as
 stub. As state the state of the actual execution is used.
 
+#### The Data Flow
+
+<p align="center">
+
+![Processing Details](doc/sow2.png)
+
+</p>
+
+The data flow is heavily based on the processing of yaml dosuments
+with _spiff++_.
+
+Every component is processed separately.
+
+- First, the installation configuration is processed together with a
+  configuration template provided by the installation source. The result
+  is an effective installation configuration stored in the `gen` folder.
+- Second, the `component.yaml` is processed together with the installation
+  configuration used as stub to achieve the effective component meta data.
+  Here, dedicated components can be activated or deactivated, or dependencies
+  might be adjusted according to the actual installation configuration.
+- Third, the component meta data is evaluated to determine the effective
+  component dependencies and stubs used for the further processing.
+  The export information of the used components are gathered and aggregated
+  into a single import file.
+- Fourth, the `deployment.yaml` is processed to determine the concreate
+  plugin sequence and their configuration settings.
+- Fifth, the effective deploment configuration is evaluated and the plugin
+  set and order is determined. Then the plugins are called in the
+  appropriate order together with their dedicated configuration settings.
+  The plugins might access and provide own instance specific state information.
+  (For example a `terraform.thstate` file).
+- Sixth, an optional additional state can be provided by processing an
+  `state.yaml` that will be used as stub for subsequent exection of
+  deployment actions.
+- Seventh, the `export.yaml`is processed together with the latest state
+  to generate the interface information for using components.
 
 ### The command
 
