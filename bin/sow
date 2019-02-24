@@ -38,7 +38,12 @@ help()
   found "    -l          show extended $nCOMPONENT info"
   info "  deploy {<components>}         deploy components"
   echo "  delete {<components>}         delete deployment of components"
-  info "  generate [-se] {<components>} execute generation step(s) only"
+  info "  generate [-cpdPse] {<components>} execute generation step(s) only"
+  info "                                    default is component,prepare,deployment"
+  found "    -c          also the component manifest procesing step"
+  found "    -p          also the prepare step"
+  found "    -d          also the deploment manifest processing step"
+  found "    -P          also the plugin execution step"
   found "    -s          also the state step"
   found "    -e          also the export step"
   info "  add {<components>}            create a frame for a new component"
@@ -144,7 +149,7 @@ setupProductMeta()
   jsonAddString jprod dir "$rel"
   jsonAdd JMETAPRODS "$product" "{ $jprod }"
 
-  verbose "found $nPRODUCT $product: $rel"
+  debug "found $nPRODUCT $product: $rel"
   while IFS= read -r line; do
     setupComponentMeta "$line"
   done < <(find "$1/$dCOMPONENTS" -name $fCOMPDEF)
@@ -163,7 +168,7 @@ setupComponentMeta()
   local jdeps
 
   setComponent "${1%/*}"
-  verbose "  $component: $reldir ($product)"
+  debug "  $component: $reldir ($product)"
   getComponentJSON "$line"
   declare -A import_map
   getImports import_map COMPONENTJSON
@@ -180,7 +185,7 @@ setupComponentMeta()
 
   for i in "${!import_map[@]}"; do
     i="$(sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'<<<"$i")"
-    verbose "    $i: ${import_map["$i"]}"
+    debug "    $i: ${import_map["$i"]}"
 
     local jdep=""
     jsonAddString jdep label "$i"
@@ -281,7 +286,7 @@ showComponent()
   local usedby
   local i
 
-  title " - $c: ${COMPONENTS[$c]}"
+  title " - $c: ${COMPONENTS["$c"]}"
   getComponentMeta comp "$c"
   getComponentMetaProduct prod comp
   getMetaProductDir dir "$prod"
@@ -304,7 +309,7 @@ showComponent()
   info "     exportdir: $EXPORT/$c"
   info "     statedir: $STATE/$c"
   ( # should be part of the landscape meta data, later on
-    CURRENT="$ROOT/${COMPONENTS[$c]}"
+    CURRENT="$ROOT/${COMPONENTS["$c"]}"
     setComponent "$CURRENT"
     getComponentJSON "$CURRENT/$fCOMPDEF"
     PRODUCTDIR="$productdir"
@@ -447,7 +452,7 @@ _CMD_show()
 
 CMD_generate()
 {
-  declare -A params=( [c]=component [d]=deployment [p]=plugins [e]=export [s]=state )
+  declare -A params=( [c]=component [p]=prepare [d]=deployment [P]=plugins [e]=export [s]=state )
   declare -A opts=( )
   OPT_parse_options params opts "$@"
   shift $(( _cnt - 1 ))
@@ -787,7 +792,8 @@ if [ -n "$PRODUCT" ]; then
   verbose "$nPRODUCT = $PRODUCT"
   if [ -n "$COMPONENT" ]; then
     verbose "$nCOMPONENT = $COMPONENT"
-    verbose "$nCOMPONENT dir = $CURRENT ($CURRENTRELDIR)"
+    reldir="${CURRENT#$ROOT/}"
+    verbose "$nCOMPONENT dir = $CURRENT ($reldir)"
   fi
 fi
 

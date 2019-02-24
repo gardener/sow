@@ -645,7 +645,7 @@ PLUGIN_setup()
   fi
 
   if [ -z "$PLUGINCONFIGJSON" ]; then
-    found "getting config from settings field $PLUGININSTANCE"
+    verbose "getting config from settings field $PLUGININSTANCE"
     getJSON PLUGINCONFIGJSON "$PLUGININSTANCE" SETTINGSJSON
     export PLUGINCONFIGJSON
   fi
@@ -655,5 +655,5 @@ PLUGIN_setup()
   state="$STATEDIR/$PLUGININSTANCE"
   mkdir -p "$dir" "$state"
 
-  found "using path $PLUGININSTANCE"
+  verbose "using path $PLUGININSTANCE"
 }

@@ -175,7 +175,7 @@ So far, three fields are used:
    If a nested component (containing a `/`), there should be a label
    to simplify the access during the interpolation process later on.
 
-- `stubs`: alist with stub files that should be added to the merging
+- `stubs`: a list with stub files that should be added to the merging
    processess for the other control files. Thise files typically
    contain settings or utility functions, that should be used during the
    interpolation process.
@@ -187,25 +187,42 @@ So far, three fields are used:
 - `active`: boolean value indication whether this component is active in
   the actual landscape.
 
+
+- `plugins`: plugin definitions (see [deployment.yaml](#deploymentyaml))
+  called before deployment evaluation (action `prepare`) and after deletion
+  steps (action `cleanup`).
+
 This file is processed by _spiff_ using the landscape configuration
 and the tool's `component.yaml` template file as stub.
 
 #### `deployment.yaml`
 
-This document is used to describe the used plugins for a component and
+This document is used to describe the used deployment plugins for a component and
 their configuration settings.
-It is processed by spiff using some stub files.
+It is processed by _spiff_ using some stub files.
 
+- the actual execution environment (see below)
 - the last state document (described by `state.yaml`)
-- the effective installstion configuration `gen/config.json`
 - the import information (see below)
-- addtional stubs described by the `component.yaml`
+- the effective installation configuration `gen/config.json`
+- additional stubs described by the `component.yaml`
+
+The environment stub contains the node `env` with fields describing the
+actual component environment:
+  - `COMPONENT`: the component name
+  - `GENDIR`: component specific folder for temporary files
+  - `STATEDIR`: component specific folder for persistent files
+  - `EXPORTDIR`: component specific folder for contract files
+  - `ROOTDIR`: installtion root directory
+  - `ROOTPRODUCTDIR`: installation source directory
+  - `PRODUCT`: in case of nested products the product name
+  - `PRODUCTDIR`: the root directory of the components product
 
 _sow_ evaluates the dependencies and generates an additional stub file
 containing the exports of all imported components.
 They are stored with their _label_ below the node `imports`.
 
-The effective deployment configuration is stored in the `gen` below the
+The effective deployment configuration is stored in the `gen` directory below the
 component folder.
 
 It should contain a `plugins` node listing the plugins that should be executed.

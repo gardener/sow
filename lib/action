@@ -59,7 +59,7 @@ action_deployment()
 
   steps=( "$@" )
   if contains all "${steps[@]}"; then
-    steps=( component prepare deployment plugins state export )
+    steps=( component prepare deployment plugins state export all )
   fi
 
   if [ -x "$ROOTPRODUCTDIR/lib/action" ]; then
@@ -93,7 +93,7 @@ action_deployment()
 
   if contains component "${steps[@]}";then 
     if [ -f "$CURRENT/$fCOMPDEF" ]; then
-      found "generating effective component manifest"
+      verbose "generating effective component manifest"
       getComponentJSON "$CURRENT/$fCOMPDEF"
     else
       COMPONENTJSON="{}"
@@ -103,6 +103,17 @@ action_deployment()
     COMPONENTJSON="$(spiff merge --json "$GENDIR/$fCOMPDEF")"
   fi
   export COMPONENTJSON
+
+  ############################
+  # prepare 
+  ############################
+  # 
+  # The component.yaml may contain preparational plugin 
+  # calls. They are executed with action prepare.
+  #
+  if contains prepare "${steps[@]}";then 
+    exec_configured_plugins prepare "component.plugins" COMPONENTJSON
+  fi
 
   # evaluate imports
   imports="{}"
@@ -148,7 +159,10 @@ action_deployment()
   deployment=
 
   if [ ${#stubs[@]} -ne 0 ]; then
-    echo "using stubs ${stubs[@]}"
+    verbose "using additional stubs"
+    for i in "${stubs[@]}"; do
+      verbose "- $i"
+    done
   fi
   deploymentstubs=("$CURRENT/$fACTIONDEF" "${stubs[@]}" "$CONFIG" "$GENDIR/import.json")
   if [ -f "$STATEDIR/state.yaml" ]; then
@@ -158,7 +172,7 @@ action_deployment()
 
 
   if contains deployment "${steps[@]}";then 
-    found "generating effective deployment manifest"
+    verbose "generating effective deployment manifest"
     if [ -f "$CURRENT/$fACTIONDEF" ]; then
         DEPLOYMENTJSON="$(spiff merge --json "${deploymentstubs[@]}" || fail "processing $fACTIONDEF")"
     fi
@@ -176,18 +190,31 @@ action_deployment()
   ############################
 
   if contains plugins "${steps[@]}";then 
-    found "execute configured plugins for action $action"
     case "$action" in
-        (deploy)  exec_configured_plugins deploy DEPLOYMENTJSON
+        (deploy)  exec_configured_plugins deploy "plugins" DEPLOYMENTJSON
                   if _is_function "deploy"; then
                      deploy "$@"
                   fi;;
         (delete)  if _is_function "delete"; then
                      delete "$@"
                   fi
-                  exec_configured_plugins delete DEPLOYMENTJSON;;
+                  exec_configured_plugins delete "plugins" DEPLOYMENTJSON;;
         (*) fail "unknown command $action";;
     esac
+  fi
+
+  ############################
+  # cleanup 
+  ############################
+  # 
+  # The component.yaml may contain preparational plugin 
+  # calls. They are executed with action cleanup
+  # fore component deletion.
+  #
+  if contains prepare "${steps[@]}";then 
+    if [ "$action" = delete ]; then
+      exec_configured_plugins cleanup "component.plugins" COMPONENTJSON
+    fi
   fi
 
   if contains state "${steps[@]}";then 
@@ -196,6 +223,12 @@ action_deployment()
 
   if contains export "${steps[@]}";then 
     handle_exports
+  fi
+
+  if contains all "${steps[@]}";then
+    if [ "$action" = delete ]; then
+      rm -rf "$GENDIR"
+    fi
   fi
 }
 
@@ -206,7 +239,7 @@ action_deployment()
 _exec_plugin()
 {
   if [ -z "$hide" ]; then
-    title "Plugin: $1 ($2)"
+    title "Plugin: $1[$3] ($2)"
   fi
   (
     if [ "${opts[plugin]}" = "${1}" ]; then
@@ -267,7 +300,8 @@ exec_plugin()
 
 
 # $1: action
-# $2: variable holding config with fields
+# $2: field path
+# $3: variable holding config with fields
 #
 # plugins:
 #   - <name>
@@ -289,10 +323,18 @@ exec_configured_plugins() {
     order="| reverse"
   fi
   local plugins=( )
-  getPluginList plugins "plugins" "$2" "$order"
+  local msg="executing configured plugins for action $action"
+  getPluginList plugins "$2" "$3" "$order"
   for p in "${plugins[@]}"; do
-    exec_plugin "$1" "$p" "$2"
+    if [ -n "$msg" ]; then
+      verbose "$msg"
+      msg=
+    fi
+    exec_plugin "$1" "$p" "$3"
   done
+  if [ -n "$msg" ]; then
+    verbose "no plugins found for action $action"
+  fi
 }
 
 handle_exports()
@@ -328,8 +370,8 @@ restore() {
 
 handle_state()
 {
-  title update state
-  if [ -f "$CURRENT/state.yaml" ]; then
+  title updating state
+  if [ "$action" != "delete" -a -f "$CURRENT/state.yaml" ]; then
       if [ -f "$STATEDIR/state.yaml" ]; then
           cp "$STATEDIR/state.yaml"  "$STATEDIR/state.yaml.bak"
           if [ -n "$DEPLOYMENTJSON" ]; then
@@ -344,5 +386,9 @@ handle_state()
               spiff merge "$CURRENT/state.yaml" > "$STATEDIR/state.yaml"
           fi
       fi
+  else
+    if [ "$action" = "delete" ]; then
+      rm -rf "$STATEDIR"
+    fi
   fi
 }
