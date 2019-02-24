@@ -23,7 +23,7 @@ loadHandlers()
 loadHandlers "$PLUGIN" "$CURRENT/lib/kubectl" "$PRODUCTDIR/lib/kubectl"
 
 for h in "${@:3}"; do
-  found "loading handler $h"
+  verbose "loading handler $h"
   f="$(lookupFile "$h")"
   if [ -n "$f" ]; then
     source "$f"
@@ -56,10 +56,10 @@ setKubeConfig()
       kubeconfig="$2"
     fi
     cp "$kubeconfig" "$3"
-    found "    using $kubeconfig"
+    verbose "    using $kubeconfig"
   else
     echo "$2" > "$3"
-    found "    using inline kubeconfig"
+    verbose "    using inline kubeconfig"
   fi
 }
 
@@ -101,7 +101,7 @@ exec_action()
   fi
   local f="action_${1}_${kind}_${group//\./_}"
   if _is_function "$f"; then
-    found "    using handler $f"
+    verbose "    using handler $f"
     $f "$name" "$namespace" "$2" "$3"
   else
     case "$1" in

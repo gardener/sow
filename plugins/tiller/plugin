@@ -3,6 +3,10 @@
 source "$SOWLIB/pluginutils"
 source "$SOWLIB/k8s"
 
+if [ -d "$GEN" ]; then
+  export HELM_HOME="$GEN/.helm"
+fi
+
 helminit() {
     helm init --service-account=tiller
 }

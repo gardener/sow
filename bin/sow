@@ -518,6 +518,7 @@ _CMD_delete()
     confirm "*** deleting $nCOMPONENT $c"
     ACTION_execute "$c" action_deployment delete all
     confirm "*** $nCOMPONENT $c deleted"
+    confirm
   done
 }
 

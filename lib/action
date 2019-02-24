@@ -26,8 +26,6 @@ ACTION_setup()
   export CONFIGJSON
   export KUBECONFIG
   export DOMAIN
-  
-  mkdir -p "$STATEDIR" "$GENDIR" "$EXPORTDIR"
 }
 
 # $1; component
@@ -56,6 +54,15 @@ action_deployment()
 {
   action="$1"
   shift
+
+  if [ "$action" = delete ]; then
+    if [ ! -f "$EXPORTDIR/export.yaml" ]; then
+      warn "$nCOMPONENT $COMPONENT already deleted or not yet deployed"
+      return 0
+    fi
+  fi
+
+  mkdir -p "$STATEDIR" "$GENDIR" "$EXPORTDIR"
 
   steps=( "$@" )
   if contains all "${steps[@]}"; then
