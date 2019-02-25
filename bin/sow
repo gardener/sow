@@ -33,6 +33,7 @@ help()
   info "  info  [-al]                   show info about current location"
   found "    -l            show extended $nCOMPONENT info"
   found "    -a            show all $nCOMPONENTS in landscape"
+  found "    -m            match given $nCOMPONENT names against file system"
   info "  order [-daA] {<components>}   show $nCOMPONENT order"
   found "    -d            deletion order"
   found "    -a            complete according to dependencies"
@@ -439,14 +440,25 @@ CMD_info()
   local data=$(declare -p opts)
   declare -A params
   eval "declare -A opts="${data#*=}
-  params=( [l]=long [a]=all )
+  params=( [l]=long [a]=all [m]=matching )
   OPT_parse_options params opts "$@"
   shift $(( _cnt - 1 ))
 
   title "$nLANDSCAPE" "$ROOT"
+  comps=( )
   if [ ${opts[all]+set} ]; then
+    comps=( "${!COMPONENTS[@]}" )
+  else
+    if [ -n "$PRODUCTDIR" ]; then
+      title "$nPRODUCT" "$PRODUCT (${PRODUCTDIR#$ROOT/})"
+    fi
+    if [ ${opts[matching]+set} ]; then
+      resolveComponents comps .
+    fi
+  fi
+  if [ ${#comps[@]} -ne 0 ]; then
     title "$nCOMPONENTS:"
-    for c in "${!COMPONENTS[@]}"; do
+    for c in "${comps[@]}"; do
       if [ ${opts[long]+set} ]; then
         showComponent "$c"
       else
@@ -455,12 +467,9 @@ CMD_info()
     done
     echo
     order=( )
-    getValueList order order METAJSON
+    getOrder order "${comps[@]}"
     title "$nTOOL order: ${order[@]}"
   else
-    if [ -n "$PRODUCTDIR" ]; then
-      title "$nPRODUCT" "$PRODUCT (${PRODUCTDIR#$ROOT/})"
-    fi
     if [ -n "$CURRENT" ]; then
       if [ ${opts[long]+set} ]; then
         showComponent "$COMPONENT"
