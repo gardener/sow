@@ -6,4 +6,4 @@ rdir=${PWD#/}
 rdir="/${rdir%%/*}"
 
 # Docker run
-docker run --mount type=bind,src="$rdir",dst="/mounted$rdir" --workdir "/mounted$PWD" --rm --user "$(id -u):$(id -g)" "sow" "$@"
+docker run --mount type=bind,src="$rdir",dst="/mounted$rdir" --workdir "/mounted$PWD" --rm  -t --user "$(id -u):$(id -g)" "sow" "$@"
