@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-VERSION=0.1
+VERSION=0.1-alpha
 
 SOW="$(cd "$(dirname "${BASH_SOURCE[0]}")/.."; echo "$PWD" )"
 SOWLIB="$SOW/lib"
@@ -18,27 +18,29 @@ help()
   title "$nTOOL [<options>] [<command>]"
   echo
   title "options:"
-  found "    -a          complete the $nCOMPONENT set"
-  found "    -A          use all $nCOMPONENTS if no one is specified"
-  found "    -v          verbose mode"
-  found "    -x          trace mode"
-  found "    -X <plugin> trace mode for given plugin"
-  found "    -D          debug mode"
-  found "    --dryrun    dry run (note: not all plugins may support a dry run!)"
-  found "    --version   show version"
+  found "    -m            match given $nCOMPONENT names against file system"
+  found "                  or complete list of $nCOMPONENTS"
+  found "    -a            complete the $nCOMPONENT set according to their dependencies"
+  found "    -A            use all $nCOMPONENTS if no one is specified"
+  found "    -v            verbose mode"
+  found "    -t            trace mode"
+  found "    -X <plugin>   trace mode for given plugin"
+  found "    -D            debug mode"
+  found "    --dryrun      dry run (note: not all plugins may support a dry run!)"
+  found "    --version     show version"
   echo
   title "commands:"
   info "  info  [-al]                   show info about current location"
-  found "    -l          show extended $nCOMPONENT info"
-  found "    -a          show all $nCOMPONENTS in landscape"
+  found "    -l            show extended $nCOMPONENT info"
+  found "    -a            show all $nCOMPONENTS in landscape"
   info "  order [-daA] {<components>}   show $nCOMPONENT order"
-  found "    -d          deletion order"
-  found "    -a          complete according to dependencies"
-  found "    -A          use all $nCOMPONENTS"
-  info "  show [-l]{<components>}       show info about components"
-  found "    -l          show extended $nCOMPONENT info"
-  info "  deploy {<components>}         deploy components"
-  echo "  delete {<components>}         delete deployment of components"
+  found "    -d            deletion order"
+  found "    -a            complete according to dependencies"
+  found "    -A            use all $nCOMPONENTS"
+  info "  show [-l]{<components>}       show info about $nCOMPONENTS"
+  found "    -l            show extended $nCOMPONENT info"
+  info "  deploy {<components>}         deploy $nCOMPONENTS"
+  echo "  delete {<components>}         delete deployment of $nCOMPONENTS"
   info "  generate [-cpdPse] {<components>} execute generation step(s) only"
   info "                                    default is component,prepare,deployment"
   found "    -c          also the component manifest procesing step"
@@ -48,15 +50,16 @@ help()
   found "    -s          also the state step"
   found "    -e          also the export step"
   info "  add {<components>}            create a frame for a new component"
+  found "    -p <product>  add component to given product"
   info "  vi [-cLegsprl] {<file>}         lookup and edit file"
-  found "    -c <comp>   component different from current"
-  found "    -L          only list paths"
-  found "    -e          export dir"
-  found "    -s          state dir"
-  found "    -g          gen dir"
-  found "    -p          $nPRODUCT dir"
-  found "    -r          landscape dir"
-  found "    -l          local componet"
+  found "    -c <comp>     component different from current"
+  found "    -L            only list paths"
+  found "    -e            export dir"
+  found "    -s            state dir"
+  found "    -g            gen dir"
+  found "    -p            $nPRODUCT dir"
+  found "    -r            landscape dir"
+  found "    -l            local componet"
 }
 
 source "$SOWLIB/utils"
@@ -65,7 +68,7 @@ source "$SOWLIB/opts"
 
 declare -A opts=( )
 declare -A params
-params=( [a]=all [A]=All [v]=verbose [version]="" [dryrun]="" [x]=trace [D]=debug [p]="=$nPRODUCT" [terms]="=" [layout]="=" [X]="=plugin" [S]=stacktrace )
+params=( [m]=matching [c]=range [a]=all [A]=All [v]=verbose [version]="" [dryrun]="" [x]=trace [D]=debug [p]="=$nPRODUCT" [terms]="=" [layout]="=" [X]="=plugin" [S]=stacktrace )
 OPT_parse_options params opts "$@"
 shift $(( _cnt - 1 ))
 
@@ -252,6 +255,72 @@ setupLandscape()
     fail "aborted due to dependency problems"
   fi
 
+}
+
+# $1: target var
+# $2: spec
+lookupComponents()
+{
+  local var="$1"
+  local spec="$2"
+  local dir
+  local cdir
+  local c
+  local __found=( )
+  if [ ${opts[matching]+set} ]; then
+    if [ -d "$2" ]; then
+       if [[ "$1" = /* ]]; then
+         dir="$1"
+       else
+         dir="$(cd "$2"; echo "$PWD")"
+       fi
+       for c in "${!COMPONENTS[@]}"; do
+         cdir="$ROOT/${COMPONENTS["$c"]}"
+         if [[ "$cdir" = $dir/* ]]; then
+           __found=( "${__found[@]}" "$c" )
+         fi
+       done
+    fi
+
+    if [ ${#__found[@]} -eq 0 ]; then
+       for c in "${!COMPONENTS[@]}"; do
+         if [[ "$c" = $2/* || "$2" = "$c" ]]; then
+           __found=( "${__found[@]}" "$c" )
+         fi
+       done
+    fi
+  fi
+
+  if [ ${#__found[@]} -eq 0 ]; then
+    if [ "$2" = . -a -n "$COMPONENT" ]; then
+       __found=( "$COMPONENT" )
+    fi
+  fi
+
+  if [ ${#__found[@]} -eq 0 ]; then
+     c="$(CMDS_resolve_shortcut "$2" "${!COMPONENTS[@]}")"
+     if [ -n "$c" ]; then
+       if [ -n "${COMPONENTS["$c"]}" ]; then
+         __found=( "${__found[@]}" "$c" )
+       fi
+     fi
+  fi
+  eval "$var=( \"\${__found[@]}\" )"
+}
+
+CMD_list()
+{
+  local comps=( )
+  local found=( )
+
+  for c in "$@"; do
+    lookupComponents found "$c"
+    comps=( "${comps[@]}" "${found[@]}" )
+  done
+  setUniq comps "${comps[@]}"
+  for c in "${comps[@]}"; do
+    found "$c"
+  done
 }
 
 ###########################################################################
@@ -497,6 +566,7 @@ _CMD_deploy()
     confirm "*** ${nTOOL}ing $nCOMPONENT $c"
     ACTION_execute "$c" action_deployment deploy  all
     confirm "*** $nCOMPONENT $c deployed"
+    confirm
   done
 }
 
@@ -575,16 +645,12 @@ execClosure()
   fi
 
   if [ $# -ne 1 ]; then
-    resolveComponents "${@:2}"
+    resolveComponents comps "${@:2}"
   else
     if [ ${opts[All]+set} ]; then
       comps=( )
     else
-      if [ -z "$COMPONENT" ]; then
-        fail "not in a $nCOMPONENT"
-      else
-        comps=( "$COMPONENT" )
-      fi
+      resolveComponents comps .
     fi
   fi
 
@@ -599,26 +665,35 @@ execClosure()
 }
 
 
+# $1: var
+# $2+: specs
 resolveComponents()
 {
+  local var="$1"
   local s
   local c
+  shift
 
-  comps=( )
+  local __comps=( )
+  local _found=( )
 
+  wild=""
   for s in "$@"; do
-     c="$(CMDS_resolve_shortcut "$s" "${!COMPONENTS[@]}")"
-     if [ -z "$c" ]; then
-       fail "unknown $nCOMPONENT $s"
-     else
-       if [ -z "${COMPONENTS["$c"]}" ]; then
+     lookupComponents _found "$s"
+     if [ ${#_found[@]} -eq 0 ]; then
+       if [ "$s" = . ]; then
+         fail "not in a $nCOMPONENT or $nPRODUCT folder"
+       else
          fail "unknown $nCOMPONENT $s"
        fi
-       if ! contains "$c" "${comps[@]}"; then
-         comps=( "${comps[@]}" "$c" )
+     else
+       if [ ${#f_found[@]} -gt 1 ]; then
+         wild=x
        fi
+       __comps=( "${__comps[@]}" "${_found[@]}" )
      fi
   done
+  eval "$var=( \"\${__comps[@]}\" )"
 }
 
 CMD_edit()
@@ -680,6 +755,11 @@ action_edit()
 
 CMD_add()
 {
+  params=( [p]=$nProduct )
+  declare -A opts=( )
+  OPT_parse_options params opts "$@"
+  shift $(( _cnt - 1 ))
+
   local productdir="$PRODUCTDIR"
   local product="$PRODUCT"
   if [ -n "${opts[$nPRODUCT]}" ]; then
