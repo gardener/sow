@@ -67,6 +67,10 @@ source "$SOWLIB/utils"
 source "$SOWLIB/meta"
 source "$SOWLIB/opts"
 
+if [ -f ~/.${nTOOL}rc ]; then
+  source  ~/.${nTOOL}rc
+fi
+
 declare -A opts=( )
 declare -A params
 params=( [m]=matching [c]=range [a]=all [A]=All [v]=verbose [version]="" [dryrun]="" [x]=trace [D]=debug [p]="=$nPRODUCT" [terms]="=" [layout]="=" [X]="=plugin" [S]=stacktrace )
@@ -485,7 +489,7 @@ CMD_order()
   local data="$(declare -p opts)"
   declare -A params
   eval "declare -A opts="${data#*=}
-  params=( [d]=delete [a]=all [A]=All )
+  params=( [d]=delete [m]=matching [a]=all [A]=All )
   OPT_parse_options params opts "$@"
   shift $(( _cnt - 1 ))
 
@@ -509,7 +513,7 @@ CMD_show()
   local data=$(declare -p opts)
   declare -A params
   eval "declare -A opts="${data#*=}
-  params=( [l]=long [A]=all )
+  params=( [l]=long [m]=matching [a]=all [A]=all )
   OPT_parse_options params opts "$@"
   shift $(( _cnt - 1 ))
 
@@ -561,7 +565,7 @@ CMD_deploy()
   local data="$(declare -p opts)"
   declare -A params
   eval "declare -A opts="${data#*=}
-  params=( [a]=all [A]=All )
+  params=( [m]=matching [a]=all [A]=All )
   OPT_parse_options params opts "$@"
   shift $(( _cnt - 1 ))
 
@@ -584,7 +588,7 @@ CMD_delete()
   local data="$(declare -p opts)"
   declare -A params
   eval "declare -A opts="${data#*=}
-  params=( [a]=all [A]=All )
+  params=( [m]=matching [a]=all [A]=All )
   OPT_parse_options params opts "$@"
   shift $(( _cnt - 1 ))
 
@@ -874,7 +878,9 @@ source "$SOWLIB/cmd"
 source "$SOWLIB/action"
 
 
-CMDS=( deploy delete info show help vi version add generate )
+CMDS=( deploy delete info show help version generate vi add )
+add_functions CMDS CMD_
+
 cmd="$(CMDS_resolve_shortcut "$1" "${CMDS[@]}")"
 
 verbose "$nLANDSCAPE = $ROOT"

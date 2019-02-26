@@ -341,14 +341,15 @@ deployed and executes theit deploy action in the appropriate order.
 
 The following sub commands are supported:
 
-- `deploy`:  (default)  deploy components
-- `delete`:  delete components
-- `show`: show meta data of given components
-- `info`: show info about actual position in filesystem
-- `version`: show tool version
+- `deploy`:   (default)  deploy components
+- `delete`:   delete components
+- `show`:     show meta data of given components
+- `info`:     show info about actual position in filesystem
+- `version`:  show tool version
 - `generate`: generate manifests without action execution 
-- `order`: show order of components and/or their deploy or deletion order
-- `vi`: lookup or edit component related files in component specific folders
+- `order`:    show order of components and/or their deploy or deletion order
+- `add`:      create the frame for a new component
+- `vi`:       lookup or edit component related files in component specific folders
 
 The command supports the following options:
 - `-a`: complete the component list
@@ -356,11 +357,17 @@ The command supports the following options:
         for `deploy` and `delete` completes the dpeloy are delete
         order according to the configured component dependencies.
 - `-A`: `deploy`and `delete` work on all active components
+- `-m`: use given component names as patter to match against filesystem and 
+        component list
 - `-x`: enables trace mode
 - `-v`: enables verbose mode
 
 
 `sow help` prints a complete list of commands with sub sub options.
+
+
+If a file `.sowrc" exists in the users home directory it is sources
+prior to any command execution.
 
 ### Plugins
 

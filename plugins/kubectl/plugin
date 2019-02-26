@@ -10,7 +10,7 @@ loadHandlers()
   local d
   local h
   for d in "$@"; do
-    if [ -d "$d/handlers" ]; then
+    if [ -n "$d" -a -d "$d/handlers" ]; then
       for h in "$d/handlers"/*; do
         if [ -f "$h" ]; then
           source "$h"
@@ -20,7 +20,7 @@ loadHandlers()
   done
 }
 
-loadHandlers "$PLUGIN" "$CURRENT/lib/kubectl" "$PRODUCTDIR/lib/kubectl"
+loadHandlers "$PLUGIN" "$CURRENT/lib/kubectl" "$PRODUCTDIR/lib/kubectl" "$SOW_HOME"
 
 for h in "${@:3}"; do
   verbose "loading handler $h"

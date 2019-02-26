@@ -60,6 +60,23 @@ StandardErrorHandling
 # standard utils
 ################################################################################
 
+add_functions()
+{
+  local a
+  local b
+  local f
+  local cmds
+  while read a b f; do
+    if [[ "$f" = ${2}* ]]; then
+      f="${f#$2}"
+      eval "cmds=( \"\${$1[@]}\" )"
+
+      if ! contains "$f" "${cmds[@]}"; then
+        eval "$1=( \"\${cmds[@]}\" \"$f\" )"
+      fi
+    fi
+  done < <(typeset -F)
+}
 #
 # print the actual stacktrace
 # $1: number of omitted stack enries
