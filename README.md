@@ -12,29 +12,50 @@ The tool itself only handles the information flow
 among those installation components and controles
 their execution order.
 
-Each _installation component_ is described by
-a yaml document (`deployment.yaml`) containing
-the configuration settings for a dedicated set of
-installation plugins and a yaml document (`component.yaml`)
-describing the used components.
+<p align="center">
 
-The installation plugins are shell modules delivered
-with the tool itself or provided by the installation content.
+<img src="doc/sow0.png" alt="Processing" width="400"/>
 
-After installation a component may offer (_export_) (structured yaml)
-values to be used by other components, again described
+</p>
+
+Each _installation component_ is described by a set of
+yaml documents. This is used together with an installation
+configuration and information provided by used components
+to generate a deployment configuration  and a contract intended
+to be used by other components.
+
+The deployment configuration consists of a 
+sequence of plugin execution requests and their configuration.
+
+The installation plugins are shell modules or executables
+delivered with the tool itself or provided by the installation content.
+_sow_ finally just generates the plugin config and executes the plugins
+in the appropriate order.
+
+
+### Overview
+
+A _component_ is described by a set of yaml documents.
+The `component.yaml` describes the dependencies to other
+components. A `deployment.yaml` describes the configuration
+for the plugin executions. The component may 
+(_export_) (structured yaml)
+values to be used by other components (the contract), again described
 by a yaml document (`export.yaml`) and keep a state in form
 of a yaml document (`state.yaml`) or other files.
 
-The information flow is described by the component dependencies.
-Therefore _Sow_ processes the yaml documents with the
+The information flow is described by the component dependencies
+and an installation configuration.
+Therefore _sow_ processes the yaml documents with the
 [_spiff++_ in-domaim templating engine](https://github.com/mandelsoft/spiff/blob/master/README.md)
 by providing appropriate merge stubs based on
 the exports of the dependencies and the last local state.
+This allows to describe the calculation of the effective document versions
+in-place with `dynaml`expressions evaluated by _spiff_.
 
 <p align="center">
 
-![Overview](doc/sow1.png)
+![Processing](doc/sow1.png)
 
 </p>
 
@@ -78,7 +99,7 @@ The first use case is to install a garden with a
 [gardener](https://github.com/gardener/gardener) on
 a kubernetes cluster.
 
-### The filesystem structure
+### The Filesystem Structure
 
 ```
 ├── acre.yaml                  # config of the concreate installation instance
@@ -100,7 +121,7 @@ a kubernetes cluster.
 │   │   .       └── export.yaml
 │   │   .
 │   │
-│   └── greenhouses           # recursively included instellation sources
+│   └── greenhouses           # recursively included installation sources
 │       └── nestedproduct     # name as root of the installation source
 │           └── components
 │               ├── testcomp
@@ -110,7 +131,7 @@ a kubernetes cluster.
 │               │   .
 │               │   .
 │               │    
-│               ├── greenhouses  # recursively included instellation sources
+│               ├── greenhouses  # recursively included installation sources
 │               │   ├── othernestedproduct
 │               │   .
 │               .   .
@@ -290,7 +311,7 @@ stub. As state the state of the actual execution is used.
 If it contains a `files` section the listes files (structure with `path` and
 `data` fields) are written to the components export folder.
 
-#### The Data Flow
+#### The Generation Process
 
 <p align="center">
 
