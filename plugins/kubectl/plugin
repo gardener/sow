@@ -241,7 +241,9 @@ save()
       deployed=""
     fi
   fi
-  rm -f "$TMP_KUBECONFIG" "$TMP_MANIFEST"
+  if [ -z "$KEEP_TEMPFILES" ]; then
+    rm -f "$TMP_KUBECONFIG" "$TMP_MANIFEST"
+  fi
 }
 
 execute_manifest()

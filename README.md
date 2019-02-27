@@ -380,6 +380,9 @@ The command supports the following options:
 - `-A`: `deploy`and `delete` work on all active components
 - `-m`: use given component names as patter to match against filesystem and 
         component list
+- `-n`: no redeploy, just do new deployments
+- `-k`: keep temporary files
+- `-X` <plugin>: enables trace mode for given plugin
 - `-x`: enables trace mode
 - `-v`: enables verbose mode
 

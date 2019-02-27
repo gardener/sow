@@ -56,7 +56,7 @@ action_deployment()
   shift
 
   if [ "$action" = delete ]; then
-    if [ ! -f "$EXPORTDIR/export.yaml" ]; then
+    if [ ! -f "$EXPORTDIR/export.yaml" -a ! -d "$GENDIR" ]; then
       warn "$nCOMPONENT $COMPONENT already deleted or not yet deployed"
       return 0
     fi

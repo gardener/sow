@@ -25,6 +25,7 @@ help()
   found "    -A            use all $nCOMPONENTS if no one is specified"
   found "    -v            verbose mode"
   found "    -t            trace mode"
+  found "    -k            keep temporaray files"
   found "    -X <plugin>   trace mode for given plugin"
   found "    -D            debug mode"
   found "    --dryrun      dry run (note: not all plugins may support a dry run!)"
@@ -70,7 +71,7 @@ fi
 
 declare -A opts=( )
 declare -A params
-params=( [m]=matching [c]=range [a]=all [A]=All [n]=new [v]=verbose [version]="" [dryrun]="" [x]=trace [D]=debug [p]="=$nPRODUCT" [terms]="=" [layout]="=" [X]="=plugin" [S]=stacktrace )
+params=( [m]=matching [k]=keep [c]=range [a]=all [A]=All [n]=new [v]=verbose [version]="" [dryrun]="" [x]=trace [D]=debug [p]="=$nPRODUCT" [terms]="=" [layout]="=" [X]="=plugin" [S]=stacktrace )
 OPT_parse_options params opts "$@"
 shift $(( _cnt - 1 ))
 
@@ -871,6 +872,11 @@ if [ ${opts[version]+set} ]; then
   exit 0
 fi
 
+if [ ${opts[keep]+set} ]; then
+  KEEP_TEMPFILES=X
+else
+  KEEP_TEMPFILES=
+fi
 if [ ${opts[debug]+set} ]; then
   DEBUG=X
 else
@@ -896,6 +902,7 @@ fi
 
 export DRYRUN
 export DEBUG
+export KEEP_TEMPFILES
 export VERBOSE
 
 source "$SOWLIB/env"

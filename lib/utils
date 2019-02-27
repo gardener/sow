@@ -11,6 +11,7 @@ source "$SOWLIB/stdio"
 handle_error()
 {
   x=${1:-$?}
+  set +x
   if [ -n "$STACKTRACE" ]; then
     warn "ERRCODE $x (subshell $BASH_SUBSHELL) INTEND=$INTENDED_EXIT"
   fi
@@ -106,6 +107,9 @@ exec_cmd() {
   if [ -n "$DRYRUN" ]; then
     echo "$@"
   else
+    if [ -n "$VERBOSE" ]; then
+      echo "$@"
+    fi
     "$@"
   fi
 }
