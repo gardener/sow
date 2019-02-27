@@ -366,7 +366,9 @@ handle_exports()
         echo "$data" > "$EXPORTDIR/$p"
       done
   else
-    rm -f "$EXPORTDIR/export.yaml"
+    if [ "$action" = "delete" ]; then
+      rm -rf "$EXPORTDIR"
+    fi
   fi
 }
 

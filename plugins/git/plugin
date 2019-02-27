@@ -44,7 +44,7 @@ delete() {
 }
 
 case "$1" in
-    deploy) deploy "$@";;
-    delete) delete "$@";;
+    deploy|prepare) deploy "$@";;
+    delete|cleanup) delete "$@";;
     *) fail "unsupported action $1"
 esac

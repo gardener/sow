@@ -56,22 +56,9 @@ getProductForDir()
   fi
 }
 
-setComponent()
-{
-  product=
-  reldir=
-  productdir="$(getProductDir "$1")"
-  if [ -n "$productdir" ]; then
-    reldir="${1#$ROOT/}"
-    product="$(getProductForDir "$productdir")"
-    component="${1#$productdir/$dCOMPONENTS/}"
-  fi
-}
-
-
 determineRoot()
 {(
-  while [ ! -f $fCONFIG -o ! -d $dROOTPRODUCT  -o -d "$dCOMPONENTS" ]; do
+  while [ ! -f $fCONFIG -o ! \( -d $dROOTPRODUCT -o -d garden \) -o -d "$dCOMPONENTS" ]; do
     cd ..
     if [ "$(pwd)" == / ]; then
       return

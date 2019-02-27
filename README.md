@@ -103,7 +103,7 @@ a kubernetes cluster.
 
 ```
 ├── acre.yaml                  # config of the concreate installation instance
-├── garden                     # the installation source for the landscape
+├── crop                       # the installation source for the landscape
 │   ├── acre.yaml
 │   ├── components             # components of the root installation source
 │   │   ├── comp1
