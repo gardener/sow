@@ -234,7 +234,7 @@ action_deployment()
 
   if contains all "${steps[@]}";then
     if [ "$action" = delete ]; then
-      rm -rf "$GENDIR"
+      rm_directory_and_cleanup_tree "$GEN" "$GENDIR"
     fi
   fi
 }
@@ -367,7 +367,7 @@ handle_exports()
       done
   else
     if [ "$action" = "delete" ]; then
-      rm -rf "$EXPORTDIR"
+      rm_directory_and_cleanup_tree "$EXPORT" "$EXPORTDIR"
     fi
   fi
 }
@@ -397,7 +397,7 @@ handle_state()
       fi
   else
     if [ "$action" = "delete" ]; then
-      rm -rf "$STATEDIR"
+      rm_directory_and_cleanup_tree "$STATE" "$STATEDIR"
     fi
   fi
 }

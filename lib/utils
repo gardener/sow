@@ -103,6 +103,20 @@ print_stacktrace()
   ) >&2
 }
 
+# $1: base dir
+# $2: file/dir below base dir
+rm_directory_and_cleanup_tree()
+{
+  if [ -z "$1" ]; then
+    fail base directory missing
+  fi
+  if [[ "$2" != "$1"/* ]]; then
+    fail "$2" is not below "$1"
+  fi
+  rm -rf "$2"
+  find "$1" -type d -empty -delete
+}
+
 exec_cmd() {
   if [ -n "$DRYRUN" ]; then
     echo "$@"
