@@ -301,12 +301,14 @@ lookupComponents()
   fi
 
   if [ ${#__found[@]} -eq 0 ]; then
-     c="$(CMDS_resolve_shortcut "$2" "${!COMPONENTS[@]}")"
-     if [ -n "$c" ]; then
-       if [ -n "${COMPONENTS["$c"]}" ]; then
-         __found=( "${__found[@]}" "$c" )
-       fi
-     fi
+    if [ "$2" != . ]; then
+      c="$(CMDS_resolve_shortcut "$2" "${!COMPONENTS[@]}")"
+      if [ -n "$c" ]; then
+        if [ -n "${COMPONENTS["$c"]}" ]; then
+          __found=( "${__found[@]}" "$c" )
+        fi
+      fi
+    fi
   fi
   eval "$var=( \"\${__found[@]}\" )"
 }
@@ -721,7 +723,11 @@ resolveComponents()
      lookupComponents _found "$s"
      if [ ${#_found[@]} -eq 0 ]; then
        if [ "$s" = . ]; then
-         fail "not in a $nCOMPONENT or $nPRODUCT folder"
+         if [ "${opts[match]+set}" ]; then
+           fail "no $nCOMPONENT found"
+         else
+           fail "not in a $nCOMPONENT or $nPRODUCT folder"
+         fi
        else
          fail "unknown $nCOMPONENT $s"
        fi
