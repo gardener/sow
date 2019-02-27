@@ -1,5 +1,16 @@
 
-# Sow - a tiny Configuration Orchestration Framework
+
+```
+                                   ______  ____   _____        __ ______    
+                                  / / / / / ___| / _ \ \      / / \ \ \ \   
+                                 / / / /  \___ \| | | \ \ /\ / /   \ \ \ \  
+                                / / / /    ___) | |_| |\ V  V /     \ \ \ \ 
+                               /_/_/_/    |____/ \___/  \_/\_/       \_\_\_\
+                       
+```
+---
+
+# Sow - a tiny Installation Orchestration Framework
 
 _Sow_ is not yet another installation tool. It is
 not able to handle installation steps by its own.
