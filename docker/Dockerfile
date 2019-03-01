@@ -1,6 +1,6 @@
 FROM alpine:3.9
 
-RUN apk update && apk add --no-cache bash curl libc6-compat
+RUN apk update && apk add --no-cache bash curl libc6-compat findutils
 RUN apk add git=2.20.1-r0
 RUN apk add terraform=0.11.8-r0
 RUN apk add jq=1.6-r0
