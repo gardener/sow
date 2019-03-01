@@ -134,7 +134,7 @@ action_deployment()
           if [ ! -f "$EXPORT/$imp/export.yaml" ]; then
               fail "imported $nCOMPONENT $imp not deployed yet"
           fi
-          setjsonjson imports "imports.$(echo "$a")" "$(cat "$EXPORT/$imp/export.yaml" | spiff merge --json - || fail "processing import for $imp")"
+          setjsonjson imports "imports[\"$a\"]" "$(cat "$EXPORT/$imp/export.yaml" | spiff merge --json - || fail "processing import for $imp")"
       fi
   done
   echo "$imports" | jq . > "$GENDIR/import.json"
@@ -363,7 +363,12 @@ handle_exports()
         getValue data "files.$line.data" EXPORTJSON
 
         echo "exporting file $p"
-        echo "$data" > "$EXPORTDIR/$p"
+        local file="$EXPORTDIR/$p"
+        local dirname=${file%/*}
+        if [ ! -d "$dirname" ]; then
+          mkdir -p "$dirname"
+        fi
+        echo "$data" > "$file"
       done
   else
     if [ "$action" = "delete" ]; then
