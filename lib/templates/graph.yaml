@@ -1,6 +1,7 @@
 
 utilities:
-  <<: (( &temporary ))
+  <<: (( &temporary(merge || ~) ))
+
   graph:
     <<: (( &temporary ))
     _dep: (( |model,comp,closure|->contains(closure,comp) ? { $deps=[], $err=closure [comp]} :($deps=_._deps(model,comp,closure [comp]))($err=sum[deps|[]|s,e|-> length(s) >= length(e.err) ? s :e.err]) { $deps=_.join(map[deps|e|->e.deps]), $err=err} ))
