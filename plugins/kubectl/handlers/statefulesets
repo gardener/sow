@@ -1,0 +1,47 @@
+# checks if pod exists
+# $1: pod name
+# $2: namespace
+# $3: kubeconfig
+existsPod() {
+  kubectl --kubeconfig "$3" -n "$2" get pod $1  >/dev/null 2>&1 && EXIT_CODE=0 || EXIT_CODE=$? && true
+}
+
+action_delete_StatefulSet_apps() {
+    local replicas
+    local pvcnames
+    if [ -n "$SOW_FORCE" ]; then
+      replicas=$(kubectl --kubeconfig "$3" -n "$2" get statefulset "$1" -o=jsonpath='{.status.replicas}')
+      pvcnames=$(kubectl --kubeconfig "$3" -n "$2" get statefulset "$1" -o=jsonpath='{.spec.volumeClaimTemplates[*].metadata.name}') 
+    fi
+
+    exec_cmd kubectl --kubeconfig "$3" delete -f "$4"
+    if [ -n "$SOW_FORCE" ]; then
+      sleep 1
+      end=$(( $replicas - 1 ))
+      for i in `seq $end -1 0`; do
+        local name="$1-$i" 
+        existsPod $name "$2" "$3"
+        if [ $EXIT_CODE -eq 0 ]; then
+          info Forced deletion of pod $name
+          exec_cmd kubectl --kubeconfig "$3" -n "$2" delete pod "$1-$i" --grace-period=0 --force
+        fi
+      done
+      # second round for hard cases
+      for i in `seq $end -1 0`; do
+        local name="$1-$i" 
+        existsPod $name "$2" "$3"
+        if [ $EXIT_CODE -eq 0 ]; then
+          info Forced deletion of pod $name - try harder
+          exec_cmd kubectl --kubeconfig "$3" -n "$2" patch pod "$1-$i" -p '{"metadata":{"finalizers":null}}'
+        fi
+      done
+
+      for i in `seq 0 $end`; do
+        for name in $pvcnames; do
+          local pvcname="$name-$1-$i"
+          info Forced deletion of pvc $pvcname
+          exec_cmd kubectl --kubeconfig "$3" -n "$2" delete pvc "$pvcname"
+        done
+      done
+    fi
+}

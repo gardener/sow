@@ -40,6 +40,7 @@ help()
   found "    -l            show extended $nCOMPONENT info"
   info "  deploy [-aAnm] {<components>} deploy $nCOMPONENTS"
   info "  delete [-aAm] {<components>}  delete deployment of $nCOMPONENTS"
+  found "    --force       additional actions from handlers on delete (e.g. deleting state like PVC)"
   info "  generate [-cpdPse] {<components>} execute generation step(s) only"
   info "                                    default is component,prepare,deployment"
   found "    -c            also the component manifest processing step"
@@ -616,9 +617,17 @@ CMD_delete()
   local data="$(declare -p opts)"
   declare -A params
   eval "declare -A opts="${data#*=}
-  params=( [m]=matching [a]=all [A]=All )
+  params=( [m]=matching [a]=all [A]=All [force]="" )
   OPT_parse_options params opts "$@"
   shift $(( _cnt - 1 ))
+
+  if [ ${opts[force]+set} ]; then
+    debug enable dryrun
+    SOW_FORCE=X
+  else
+    SOW_FORCE=
+  fi
+  export SOW_FORCE
 
   execClosure -r _CMD_delete "$@"
 }
