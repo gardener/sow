@@ -669,9 +669,9 @@ if [ -n "$TRACE" ]; then
   set -x
 fi
 
-###################################################################################
+################################################################################
 # standard plugin utilities
-###################################################################################
+################################################################################
 
 PLUGIN_setup()
 {
@@ -679,10 +679,14 @@ PLUGIN_setup()
     PLUGININSTANCE="${1:-${2:-$PLUGINNAME}}"
   fi
 
-  if [ -z "$PLUGINCONFIGJSON" ]; then
+  if [ -n "$DEPLOYMEMT" ]; then
+    SETTINGSJSON="$(cat "$DEPLOYMEMT")"
+  fi
+  if [ -z "$PLUGINCONFIG" ]; then
     verbose "getting config from settings field $PLUGININSTANCE"
     getJSON PLUGINCONFIGJSON "$PLUGININSTANCE" SETTINGSJSON
-    export PLUGINCONFIGJSON
+  else
+    PLUGINCONFIGJSON="$(cat "$PLUGINCONFIG")"
   fi
 
 

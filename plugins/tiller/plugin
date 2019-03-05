@@ -11,6 +11,8 @@ helminit() {
     helm init --service-account=tiller
 }
 
+PLUGIN_setup "$2"
+
 K8S_setKubeConfig "$PLUGININSTANCE" "$dir/kubeconfig"
 
 case $1 in

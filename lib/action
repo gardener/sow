@@ -22,10 +22,6 @@ ACTION_setup()
   export GENDIR="$GEN/$COMPONENT"
   export STATEDIR="$STATE/$COMPONENT"
   export EXPORTDIR="$EXPORT/$COMPONENT"
-
-  export CONFIGJSON
-  export KUBECONFIG
-  export DOMAIN
 }
 
 # $1; component
@@ -274,8 +270,19 @@ exec_plugin()
   getJSON config config spec
   getValueList args args spec
   
-  export SETTINGSJSON="${!3}"
-  export PLUGINCONFIGJSON="$config"
+  if [ -n "${!3}" ]; then
+    echo "${!3}" >"$GENDIR/deployment.json"
+    export DEPLOYMEMT="$GENDIR/deployment.json"
+  else
+    export DEPLOYMEMT=
+  fi
+
+  if [ -n "${config}" ]; then
+    echo "${config}" >"$GENDIR/pluginconfig.json"
+    export PLUGINCONFIG"$GENDIR/pluginconfig.json"
+  else
+    export PLUGINCONFIG=
+  fi
    
   local plugin_opts=( )
   if [ -n "$dir" ]; then
@@ -303,6 +310,9 @@ exec_plugin()
        fi
     fi
   fi
+
+  rm -f "$GENDIR/deployment.json"
+  rm -f "$GENDIR/pluginconfig.json"
 }
 
 

@@ -412,18 +412,18 @@ source or even a single component might provide own or replace existing plugins.
 
 #### API
 
-A plugin is just an executable or shell script. The provides plugins are all shell
-scripts.
+A plugin is just an executable or shell script. The provided plugins are all
+shell scripts.
 
 There is a combined environment and command line interface for the execution
-of plusings.
+of plugings.
 
 In the environment environment variables are provided for a dedicated 
 execution:
 
-- `SETTINGSJSON`: The manifest the plugin execution is taken from
-- `PLUGINCONFIGJSON`: The configuration configured in the plugin specification
-                      in the above manifest
+- `DEPLOYMEMT`: The manifest file the plugin execution is taken from
+- `PLUGINCONFIG`: A file containing the configuration configured in the plugin
+                  specification in the above manifest
 - `PLUGININSTANCE`: The configured plugin instance name/path
 
 - `GENDIR`: The place to store temporary file for the component
@@ -431,11 +431,17 @@ execution:
 - `EXPORTDIR`: The place to store files intended for reuse by other components.
 - `SOWLIB`: Library path for shell libraries offered by _sow_.
 
+In former version the json content was given directly by environment variables.
+THis might cause problems with the length of argument space for process
+creation, therefore it has been changed to file names.
+Those changes are handled automatically when using the `PLUGIN_setup` call
+or by sourcing the `pluginutils` libraray (see below).
+
 Using a complete plugin call specification (using the config/args) field
 the first variable should never be used.
 If only the arguments are used in the plugin call specification and the
 plugin requires further configuration, it should be taken from
-the `SETTINGSJSON`
+the json file provided in `DEPLOYMEMT`
 
 If the plugin call specification givens the `path` field it is passed in the
 `PLUGININSTANCE` variable. 
@@ -444,7 +450,7 @@ This should be used as sub folder path for instance specific data stored below
 plugin in a component.
 
 If no config is given, but required by the plugin this value should also be used
-to lookup the config in the `SETTINGSJSON`. It it is not given
+to lookup the config in the `DEPLOYMENT` file. If it is not given
 a convention here is to specify the path of the configuration field
 as argument, defaulted by the plugin name.
 
@@ -457,14 +463,19 @@ the contract described above. It can be used by
 source "$SOWLIB/pluginutils"
 ```
 
-It always provides the `PLUGINCONFIGJSON` and `PLUGININSTANCE` variables and feeds
-their values according the actual settings and conventions. It also sets
-the variables
+It always provides the variable `PLUGINCONFIGJSON` containing the configuration
+of the actual plugin call in json format and the variable `PLUGININSTANCE`.
+Their values are fed according to the actual settings and conventions. It also
+sets the variables
 
 - `dir`: GENDIR location for the execution
 - `state`: STATEDIR location for the execution
 
 and assures their existence.
 
+The evaluation of environment and arguments alone is done by the shell function
+`PLUGIN_setup` offered by the `utils` library.
+
 Additionally it loads the standard utils library from the _sow_ tool, that
-offers functios for (colored) output and json access (see [lib/utils](lib/utils)).
+offers functions for (colored) output and json access
+(see [lib/utils](lib/utils)).
