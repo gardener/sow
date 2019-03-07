@@ -167,8 +167,12 @@ action_deployment()
       verbose "- $i"
     done
   fi
-  deploymentstubs=("$CURRENT/$fACTIONDEF" "${stubs[@]}" "$CONFIG" "$GENDIR/import.json")
+  if [ -f "$CURRENT/deployment.yaml" ]; then
+    deploymentstubs=( "$CURRENT/deployment.yaml" )
+  fi
+  deploymentstubs=( "${deploymentstubs[@]}" "${stubs[@]}" "$CONFIG" "$GENDIR/import.json")
   if [ -f "$STATEDIR/state.yaml" ]; then
+      verbose "incorporating previous state"
       deploymentstubs=("${deploymentstubs[@]}" "$STATEDIR/state.yaml")
   fi
   deploymentstubs=("${deploymentstubs[@]}" "$GENDIR/env.json")
@@ -176,17 +180,25 @@ action_deployment()
 
   if contains deployment "${steps[@]}";then 
     verbose "generating effective deployment manifest"
-    if [ -f "$CURRENT/$fACTIONDEF" ]; then
-        DEPLOYMENTJSON="$(spiff merge --json "${deploymentstubs[@]}" || fail "processing $fACTIONDEF")"
+    if [ -f "$GENDIR/$fACTIONDEF" ]; then
+      cp "$GENDIR/$fACTIONDEF" "$GENDIR/$fACTIONDEF.bak"
+    else
+      rm -f "$GENDIR/$fACTIONDEF.bak"
     fi
+    debug spiff merge --json "${deploymentstubs[@]}"
+    DEPLOYMENTJSON="$(spiff merge --json "${deploymentstubs[@]}" || fail "processing $fACTIONDEF")"
     if [ -z "$DEPLOYMENTJSON" ]; then
       DEPLOYMENTJSON="{}"
     fi
     spiff merge - <<<"$DEPLOYMENTJSON" > "$GENDIR/$fACTIONDEF" || fail "saving $fACTIONDEF"
+    if [ -f "$GENDIR/$fACTIONDEF.bak" ]; then
+      if ! diff "$GENDIR/$fACTIONDEF" "$GENDIR/$fACTIONDEF.bak" >/dev/null; then
+        warn "deployment has changed"
+      fi
+    fi
   else 
     DEPLOYMENTJSON="$(spiff merge --json "$GENDIR/$fACTIONDEF")"
   fi
-  export DEPLOYMENTJSON
 
   ############################
   # evaluating deployment.yaml
@@ -358,11 +370,8 @@ handle_exports()
 {
   title "generating exports"
   if [ "$action" != "delete" -a -f "$CURRENT/export.yaml" ]; then
-      if [ -f "$STATEDIR/state.yaml" ]; then
-          spiff merge "$CURRENT/export.yaml" "${deploymentstubs[@]}" "$STATEDIR/state.yaml" > "$EXPORTDIR/export.yaml" || fail "processing exports"
-      else
-          spiff merge "$CURRENT/export.yaml" "${deploymentstubs[@]}" > "$EXPORTDIR/export.yaml" || fail "processing exports"
-      fi
+      debug spiff merge "$CURRENT/export.yaml" "${deploymentstubs[@]}"
+      spiff merge "$CURRENT/export.yaml" "${deploymentstubs[@]}" > "$EXPORTDIR/export.yaml" || fail "processing exports"
 
       EXPORTJSON="$(spiff merge --json "$EXPORTDIR/export.yaml" || fail "reading exports")"
       _jq_get_value '(.files // empty) | keys[]' <<<"$EXPORTJSON" | while IFS= read -r line; do
@@ -388,7 +397,10 @@ handle_exports()
 }
 
 restore() {
-    cp "$STATEDIR/state.yaml.bak"  "$STATEDIR/state.yaml"
+    if [ -f "$STATEDIR/state.yaml.bak" ]; then
+      cp "$STATEDIR/state.yaml.bak"  "$STATEDIR/state.yaml"
+      rm -f "$STATEDIR/state.new"
+    fi
     exit 1
 }
 
@@ -396,20 +408,17 @@ handle_state()
 {
   title updating state
   if [ "$action" != "delete" -a -f "$CURRENT/state.yaml" ]; then
-      if [ -f "$STATEDIR/state.yaml" ]; then
-          cp "$STATEDIR/state.yaml"  "$STATEDIR/state.yaml.bak"
-          if [ -n "$DEPLOYMENTJSON" ]; then
-              echo "$DEPLOYMENTJSON" | (spiff merge "$CURRENT/state.yaml" "$STATEDIR/state.yaml.bak" - > "$STATEDIR/state.yaml" || restore)
-          else
-              (spiff merge "$CURRENT/state.yaml" "$STATEDIR/state.yaml.bak" > "$STATEDIR/state.yaml" || restore)
-          fi
-      else
-          if [ -n "$DEPLOYMENTJSON" ]; then
-              echo "$DEPLOYMENTJSON" | spiff merge "$CURRENT/state.yaml" - > "$STATEDIR/state.yaml"
-          else
-              spiff merge "$CURRENT/state.yaml" > "$STATEDIR/state.yaml"
-          fi
-      fi
+    if [ -f "$STATEDIR/state.yaml" ]; then
+      cp "$STATEDIR/state.yaml"  "$STATEDIR/state.yaml.bak"
+    else
+      rm -f "$STATEDIR/state.yaml.bak"
+    fi
+    debug spiff merge "$CURRENT/state.yaml" "$GENDIR/$fACTIONDEF"
+    (echo "$DEPLOYMENTJSON" | spiff merge "$CURRENT/state.yaml" - > "$STATEDIR/state.new" || restore)
+    mv "$STATEDIR/state.new" "$STATEDIR/state.yaml"
+    if ! diff "$STATEDIR/state.yaml.bak" "$STATEDIR/state.yaml" >/dev/null; then
+        warn "state has been modified"
+    fi
   else
     if [ "$action" = "delete" ]; then
       rm_directory_and_cleanup_tree "$STATE" "$STATEDIR"

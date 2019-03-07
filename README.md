@@ -308,7 +308,7 @@ echo plain multi line text.
 This file should describe the information that should be kept
 for subsequent executions
 
-It uses the `deployment.yaml` and all the stubs used for its processing as
+It uses the actual effective processed `deployment.yaml` as
 stub.
 
 #### `export.yaml`

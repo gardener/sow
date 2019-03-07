@@ -46,6 +46,8 @@ utilities:
   <<: (( &temporary(merge || ~) ))
 
   state:
+    valuedata: (( |input,new,update|-> { $input=input, $value= ( stub().input == input ? stub().value :~) // type(new) == "template" ? (*new) :new } ))
     data: (( |input,new,update|-> { $input=input, $value= ( stub().input == input ? stub().value :~) // type(new) == "template" ? (*new).state :new } ))
+
     standard: (( |data,update|-> _.data(data.input, data.value,update) ))
 
