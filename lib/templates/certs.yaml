@@ -36,11 +36,18 @@ utilities:
     #
     # generate a certificate state for a given cert spec
     # using the state libraray.
-    # It must contain all the reuired key and cert fields.
+    # It must contain all the required key and cert fields.
     # offered fields in the value field:
     #   key, pub and cert
     #
     keyCert: (( |certspec,update|->utilities.state.standard(_.keyCertSpec(certspec),update) ))
+
+
+    #
+    # generate a secret value, if no default is given
+    # the length parameter specifies the length of the generated secret.
+    #
+    secret: (( |default,length,update|->utilities.state.valuedata(default,_.templates.secret, false) ))
 
     #######################
     # helper funcions
@@ -109,3 +116,8 @@ utilities:
           spec: (( certspec ))
         value: (( _.templates.value ))
 
+      #
+      # as long as spiff does not offer a secret generation
+      # a shell exec will be used to generate a new secret value
+      #
+      secret: (( &template(input // exec( "bash", "-c", "cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w " length " | head -n 1" )) ))
