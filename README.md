@@ -20,7 +20,7 @@ based on arbitrary installation
 tools, like _terraform_, _helm_, _kubectl_, etc.
 
 The tool itself only handles the information flow
-among those installation components and controles
+among those installation components and controls
 their execution order.
 
 <p align="center">
@@ -35,7 +35,7 @@ configuration and information provided by used components
 to generate a deployment configuration  and a contract intended
 to be used by other components.
 
-The deployment configuration consists of a 
+The deployment configuration consists of a
 sequence of plugin execution requests and their configuration.
 
 The installation plugins are shell modules or executables
@@ -43,16 +43,14 @@ delivered with the tool itself or provided by the installation content.
 _sow_ finally just generates the plugin config and executes the plugins
 in the appropriate order.
 
-
-### Overview
+## Overview
 
 A _component_ is described by a set of yaml documents.
 The `component.yaml` describes the dependencies to other
 components. A `deployment.yaml` describes the configuration
-for the plugin executions. The component may 
-(_export_) (structured yaml)
-values to be used by other components (the contract), again described
-by a yaml document (`export.yaml`) and keep a state in form
+for the plugin executions. The component may
+_export_ structured yaml values to be used by other components (the contract),
+again described by a yaml document (`export.yaml`) and keep a state in form
 of a yaml document (`state.yaml`) or other files.
 
 The information flow is described by the component dependencies
@@ -62,7 +60,7 @@ Therefore _sow_ processes the yaml documents with the
 by providing appropriate merge stubs based on
 the exports of the dependencies and the last local state.
 This allows to describe the calculation of the effective document versions
-in-place with `dynaml`expressions evaluated by _spiff_.
+in-place with `dynaml` expressions evaluated by _spiff_.
 
 <p align="center">
 
@@ -70,17 +68,17 @@ in-place with `dynaml`expressions evaluated by _spiff_.
 
 </p>
 
-The dependencies are also used to determine the appropriate 
+The dependencies are also used to determine the appropriate
 deployment and deletion order for the components of
 an installation source.
 
 An _installation source_ is a set of components bundled
-in a dedcated filesytem structure. This could, for example,
+in a dedicated filesystem structure. This could, for example,
 be stored and versioned in source code management systems like
 _git_. The installation sources might be nested, this means
 an installation source may also include other installation
 sources. With git, this could be done using submodules.
-In any way the result is a closed filesystem structure 
+In any way the result is a closed filesystem structure
 containing the complete installation source.
 
 Finally a _landscape_ describes a concrete installation
@@ -99,7 +97,7 @@ It can again be versioned using a versioning system.
 With git, for example, the installation source can be
 added and versioned by a git submodule.
 
-### The Wording
+## The Wording
 
 _Sow_ is not meant as noun, but verb, in the sense of the
 required action to till the soil. It is used to _sow_ the
@@ -110,10 +108,10 @@ The first use case is to install a garden with a
 [gardener](https://github.com/gardener/gardener) on
 a kubernetes cluster.
 
-### The Filesystem Structure
+## The Filesystem Structure
 
 ```
-├── acre.yaml                  # config of the concreate installation instance
+├── acre.yaml                  # config of the concrete installation instance
 ├── crop                       # the installation source for the landscape
 │   ├── acre.yaml
 │   ├── components             # components of the root installation source
@@ -168,9 +166,9 @@ a kubernetes cluster.
 .
 ```
 
-### The control files
+## The control files
 
-#### `acre.yaml`
+### `acre.yaml`
 
 This file may contain any configuration information in any 
 structure required by the installation source.
@@ -178,47 +176,47 @@ structure required by the installation source.
 A convention is to use a node `landscape` to hold the
 configuartion information. 
 
-Using dedicated elements has an advantage for the later mergeing process,
+Using dedicated elements has an advantage for the later merging process,
 because it avoids undesired overrides and allows access to dedicated
 kinds of information for the yaml interpolation steps.
 
-This document is processed by spiff using an optional `acre.yaml` located 
+This document is processed by spiff using an optional `acre.yaml` located
 in the root installation source as template.
-Tis template can be used to provide defaults or to check and required values
+Tis template can be used to provide defaults or to check required values
 in the configuration (using _spiff_ features).
 
 The processing result is stored in `gen/config.json`. This file
 is used as stub for the processing of the other control files.
 
-#### `component.yaml`
+### `component.yaml`
 
 This file indicates the root folder of a component. It is used by
 _sow_ to extract control information for the component held in
 the node `component`.
 
 So far, three fields are used:
+
 - `imports`: a list of components the actual component depends on.
    The import can be labeled by using the syntax 
-   
+
    <p align="center">
-   _<label>_`: `_<component name>_
+   &lt;label&gt;: &lt;component name&gt;
    </p>
 
-   If a nested component (containing a `/`), there should be a label
+   If a component is a nested component (containing a `/`), there should be a label
    to simplify the access during the interpolation process later on.
 
 - `stubs`: a list with stub files that should be added to the merging
-   processess for the other control files. Thise files typically
+   processess for the other control files. These files typically
    contain settings or utility functions, that should be used during the
    interpolation process.
-   The given file names should be relative paths. They are lookuped
+   The given file names should be relative paths. They are looked up
    - locally to the component
    - locally to the installation source
    - locally to the _sow_ tool root
 
-- `active`: boolean value indication whether this component is active in
+- `active`: boolean value indicating whether this component is active in
   the actual landscape.
-
 
 - `plugins`: plugin definitions (see [deployment.yaml](#deploymentyaml))
   called before deployment evaluation (action `prepare`) and after deletion
@@ -227,7 +225,7 @@ So far, three fields are used:
 This file is processed by _spiff_ using the landscape configuration
 and the tool's `component.yaml` template file as stub.
 
-#### `deployment.yaml`
+### `deployment.yaml`
 
 This document is used to describe the used deployment plugins for a component and
 their configuration settings.
@@ -241,14 +239,15 @@ It is processed by _spiff_ using some stub files.
 
 The environment stub contains the node `env` with fields describing the
 actual component environment:
-  - `COMPONENT`: the component name
-  - `GENDIR`: component specific folder for temporary files
-  - `STATEDIR`: component specific folder for persistent files
-  - `EXPORTDIR`: component specific folder for contract files
-  - `ROOTDIR`: installtion root directory
-  - `ROOTPRODUCTDIR`: installation source directory
-  - `PRODUCT`: in case of nested products the product name
-  - `PRODUCTDIR`: the root directory of the components product
+
+- `COMPONENT`: the component name
+- `GENDIR`: component specific folder for temporary files
+- `STATEDIR`: component specific folder for persistent files
+- `EXPORTDIR`: component specific folder for contract files
+- `ROOTDIR`: installation root directory
+- `ROOTPRODUCTDIR`: installation source directory
+- `PRODUCT`: in case of nested products the product name
+- `PRODUCTDIR`: the root directory of the component's product
 
 _sow_ evaluates the dependencies and generates an additional stub file
 containing the exports of all imported components.
@@ -281,13 +280,13 @@ plugins:
        - "sowing"
 ```
 
-By convention, if arguments are used andthe plugin requires a configuration
+By convention, if arguments are used and the plugin requires a configuration
 the first argument describes the path of the yaml node that
 contains the configuration for the plugin call. By default a plugin
 should assume its name as path. The better way is to specify the
 configuration directly in the plugin node as described above.
 
-The denoted path should then contain the actual configuration for
+The denoted path should contain the actual configuration for
 the plugin. This way the same plugin can be called multiple times
 with different settings.
 
@@ -303,7 +302,7 @@ If the plugin name start with a `-`, its execution is not notified
 on the output. This can be used for the `echo` plugin to
 echo plain multi line text.
 
-#### `state.yaml`
+### `state.yaml`
 
 This file should describe the information that should be kept
 for subsequent executions
@@ -311,7 +310,7 @@ for subsequent executions
 It uses the `deployment.yaml` and all the stubs used for its processing as
 stub.
 
-#### `export.yaml`
+### `export.yaml`
 
 This file should describe the information intended for reuse by other
 components. By convention it should be stored below an `export` node.
@@ -322,7 +321,7 @@ stub. As state the state of the actual execution is used.
 If it contains a `files` section the listes files (structure with `path` and
 `data` fields) are written to the components export folder.
 
-#### The Generation Process
+### The Generation Process
 
 <p align="center">
 
@@ -330,46 +329,47 @@ If it contains a `files` section the listes files (structure with `path` and
 
 </p>
 
-The data flow is heavily based on the processing of yaml dosuments
+The data flow is heavily based on the processing of yaml documents
 with _spiff++_.
 
 Every component is processed separately.
 
-- First, the installation configuration is processed together with a
+1. the installation configuration is processed together with a
   configuration template provided by the installation source. The result
   is an effective installation configuration stored in the `gen` folder.
-- Second, the `component.yaml` is processed together with the installation
+2. the `component.yaml` is processed together with the installation
   configuration used as stub to achieve the effective component meta data.
   Here, dedicated components can be activated or deactivated, or dependencies
   might be adjusted according to the actual installation configuration.
-- Third, the component meta data is evaluated to determine the effective
+3. the component meta data is evaluated to determine the effective
   component dependencies and stubs used for the further processing.
   The export information of the used components are gathered and aggregated
   into a single import file.
-- Fourth, the `deployment.yaml` is processed to determine the concreate
+4. the `deployment.yaml` is processed to determine the concrete
   plugin sequence and their configuration settings.
-- Fifth, the effective deploment configuration is evaluated and the plugin
+5. the effective deploment configuration is evaluated and the plugin
   set and order is determined. Then the plugins are called in the
   appropriate order together with their dedicated configuration settings.
   The plugins might access and provide own instance specific state information.
   (For example a `terraform.thstate` file).
-- Sixth, an optional additional state can be provided by processing an
+6. an optional additional state can be provided by processing an
   `state.yaml` that will be used as stub for subsequent exection of
   deployment actions.
-- Seventh, the `export.yaml`is processed together with the latest state
+7. the `export.yaml`is processed together with the latest state
   to generate the interface information for using components.
 
-### The command
+## The command
 
-_sow_ evaluates the current working directory fo figure out
+_Sow_ evaluates the current working directory fo figure out
+
 - the concrete installation folder
-- the actual product 
-- the actual component 
+- the actual product
+- the actual component
 
 This information is then used as default for its execution.
 
-By default _sow_ interprets its arguments as components that should be 
-deployed and executes theit deploy action in the appropriate order.
+By default _sow_ interprets its arguments as components that should be
+deployed and executes their deploy actions in the appropriate order.
 
 The following sub commands are supported:
 
@@ -378,64 +378,61 @@ The following sub commands are supported:
 - `show`:     show meta data of given components
 - `info`:     show info about actual position in filesystem
 - `version`:  show tool version
-- `generate`: generate manifests without action execution 
+- `generate`: generate manifests without action execution
 - `order`:    show order of components and/or their deploy or deletion order
 - `add`:      create the frame for a new component
 - `vi`:       lookup or edit component related files in component specific folders
 
 The command supports the following options:
+
 - `-a`: complete the component list
         for `info` it shows the complete component and product list
-        for `deploy` and `delete` completes the dpeloy are delete
+        for `deploy` and `delete` completes the deploy and delete
         order according to the configured component dependencies.
 - `-A`: `deploy`and `delete` work on all active components
-- `-m`: use given component names as patter to match against filesystem and 
+- `-m`: use given component names as pattern to match against filesystem and
         component list
 - `-n`: no redeploy, just do new deployments
 - `-k`: keep temporary files
-- `-X` <plugin>: enables trace mode for given plugin
+- `-X` \<plugin\>: enables trace mode for given plugin
 - `-x`: enables trace mode
 - `-v`: enables verbose mode
 
+`sow help` prints a complete list of commands with supported options.
 
-`sow help` prints a complete list of commands with sub sub options.
-
-
-If a file `.sowrc" exists in the users home directory it is sources
+If a file `.sowrc` exists in the user's home directory it is sourced
 prior to any command execution.
 
-### Plugins
+## Plugins
 
-Plugins are used to exeutes the real installation work.
+Plugins are used to exeute the real installation work.
 There are several plugins delivered with the tool, but an installation
 source or even a single component might provide own or replace existing plugins.
 
-#### API
+### API
 
 A plugin is just an executable or shell script. The provided plugins are all
 shell scripts.
 
 There is a combined environment and command line interface for the execution
-of plugings.
+of plugins.
 
-In the environment environment variables are provided for a dedicated 
-execution:
+In the environment environment variables are provided for a dedicated execution:
 
 - `DEPLOYMEMT`: The manifest file the plugin execution is taken from
 - `PLUGINCONFIG`: A file containing the configuration configured in the plugin
                   specification in the above manifest
 - `PLUGININSTANCE`: The configured plugin instance name/path
-
-- `GENDIR`: The place to store temporary file for the component
+- `GENDIR`: The place to store temporary files for the component
 - `STATEDIR`: The place to store persistent (state relevant) files for the component
 - `EXPORTDIR`: The place to store files intended for reuse by other components.
 - `SOWLIB`: Library path for shell libraries offered by _sow_.
 
-In former version the json content was given directly by environment variables.
-THis might cause problems with the length of argument space for process
+In former versions the json content was given directly by environment variables.
+This might cause problems with the length of argument space for process
 creation, therefore it has been changed to file names.
 Those changes are handled automatically when using the `PLUGIN_setup` call
-or by sourcing the `pluginutils` libraray (see below).
+or by sourcing the `pluginutils` library (see below).
 
 Using a complete plugin call specification (using the config/args) field
 the first variable should never be used.
@@ -444,7 +441,7 @@ plugin requires further configuration, it should be taken from
 the json file provided in `DEPLOYMEMT`
 
 If the plugin call specification givens the `path` field it is passed in the
-`PLUGININSTANCE` variable. 
+`PLUGININSTANCE` variable.
 This should be used as sub folder path for instance specific data stored below
 `GENDIR`, `STATEDIR` or `EXPORTDIR`, to separate different usages of the same
 plugin in a component.
@@ -454,7 +451,7 @@ to lookup the config in the `DEPLOYMENT` file. If it is not given
 a convention here is to specify the path of the configuration field
 as argument, defaulted by the plugin name.
 
-#### Shell scripts as plugins
+### Shell scripts as plugins
 
 If a plugin is implemented by a shell script, there is a library that handles
 the contract described above. It can be used by
