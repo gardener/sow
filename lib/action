@@ -384,6 +384,11 @@ handle_exports()
 {
   title "generating exports"
   if [ "$action" != "delete" -a -f "$CURRENT/export.yaml" ]; then
+      if [ -f "$EXPORTDIR/export.yaml" ]; then
+        cp "$EXPORTDIR/export.yaml"  "$EXPORTDIR/export.yaml.bak"
+      else
+        rm -f "$EXPORTDIR/export.yaml.bak"
+      fi
       debug spiff merge "$CURRENT/export.yaml" "${deploymentstubs[@]}"
       spiff merge "$CURRENT/export.yaml" "${deploymentstubs[@]}" > "$EXPORTDIR/export.yaml" || fail "processing exports"
 

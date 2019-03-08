@@ -55,6 +55,7 @@ help()
   info "  deploy [-aAnm] {<components>} deploy $nCOMPONENTS"
   info "  delete [-aAm] {<components>}  delete deployment of $nCOMPONENTS"
   found "    --force       additional actions from handlers on delete (e.g. deleting state like PVC)"
+  info "  burndown [-aAm] {<components>}  alias for 'delete --force'"
   info "  generate [-cpdPse] {<components>} execute generation step(s) only"
   info "                                    default is component,prepare,deployment"
   found "    -c            also the component manifest processing step"
@@ -65,7 +66,7 @@ help()
   found "    -e            also the export step"
   info "  add {<components>}            create a frame for a new $nCOMPONENT"
   found "    -p <product>  add $nCOMPONENT to given product"
-  info "  vi [-cLegsprl] {<file>}         lookup and edit file"
+  info "  vi [-cLegsprl] {<file>}       lookup and edit file"
   found "    -c <comp>     $nCOMPONENT different from current"
   found "    -L            only list paths"
   found "    -e            export dir"
@@ -74,6 +75,10 @@ help()
   found "    -p            $nPRODUCT dir"
   found "    -r            landscape dir"
   found "    -l            local $nCOMPONENT"
+  info "  diff [-dse] {<components>}    compare old and new version of generated files"
+  found "    -e            export file"
+  found "    -s            state file"
+  found "    -d            deployment file"
 }
 
 source "$SOWLIB/utils"
@@ -597,6 +602,41 @@ _CMD_generate()
   done
 }
 
+CMD_diff()
+{
+  declare -A params=( [d]=deployment [e]=export [s]=state )
+  declare -A opts=( )
+  OPT_parse_options params opts "$@"
+  shift $(( _cnt - 1 ))
+
+  execClosure _CMD_diff "$@"
+}
+
+_CMD_diff()
+{
+  for c in "$@"; do
+    if [ ${opts[deployment]+set} ]; then
+      _diff "$GEN" "$c" deployment.yaml
+    fi
+    if [ ${opts[export]+set} ]; then
+      _diff "$EXPORT" "$c" export.yaml
+    fi
+    if [ ${opts[state]+set} ]; then
+      _diff "$STATE" "$c" state.yaml
+    fi
+  done
+}
+
+_diff()
+{
+  if [ -f "$1/$2/$3.bak" ]; then
+    title "Diff for $3 of $nCOMPONENT $2"
+    spiff diff "$1/$2/$3" "$1/$2/$3.bak"
+  else
+    info "Nothing to compare for $3 of $nCOMPONENT $2"
+  fi
+}
+
 CMD_deploy()
 {
   local data="$(declare -p opts)"
@@ -626,6 +666,11 @@ _CMD_deploy()
   done
 }
 
+CMD_burndown()
+{
+  CMD_delete --force "$@"
+}
+
 CMD_delete()
 {
   local data="$(declare -p opts)"
@@ -636,7 +681,6 @@ CMD_delete()
   shift $(( _cnt - 1 ))
 
   if [ ${opts[force]+set} ]; then
-    debug enable dryrun
     SOW_FORCE=X
   else
     SOW_FORCE=
@@ -939,7 +983,7 @@ source "$SOWLIB/cmd"
 source "$SOWLIB/action"
 
 
-CMDS=( deploy delete info show help version generate vi add )
+CMDS=( deploy delete burndown info show help version generate vi add diff )
 add_functions CMDS CMD_
 
 cmd="$(CMDS_resolve_shortcut "$1" "${CMDS[@]}")"

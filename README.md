@@ -382,6 +382,7 @@ The following sub commands are supported:
 - `order`:    show order of components and/or their deploy or deletion order
 - `add`:      create the frame for a new component
 - `vi`:       lookup or edit component related files in component specific folders
+- `diff`:     compare old and new version of generated files
 
 The command supports the following options:
 
