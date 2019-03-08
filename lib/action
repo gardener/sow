@@ -430,8 +430,10 @@ handle_state()
     debug spiff merge "$CURRENT/state.yaml" "$GENDIR/$fACTIONDEF"
     (echo "$DEPLOYMENTJSON" | spiff merge "$CURRENT/state.yaml" - > "$STATEDIR/state.new" || restore)
     mv "$STATEDIR/state.new" "$STATEDIR/state.yaml"
-    if ! diff "$STATEDIR/state.yaml.bak" "$STATEDIR/state.yaml" >/dev/null; then
-        warn "state has been modified"
+    if [ -f "$STATEDIR/state.yaml.bak" ]; then
+      if ! diff "$STATEDIR/state.yaml.bak" "$STATEDIR/state.yaml" >/dev/null; then
+          warn "state has been modified"
+      fi
     fi
   else
     if [ "$action" = "delete" ]; then

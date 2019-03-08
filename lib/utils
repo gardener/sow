@@ -698,7 +698,7 @@ PLUGIN_setup()
   fi
   if [ -z "$PLUGINCONFIG" ]; then
     verbose "getting config from settings field $PLUGININSTANCE"
-    getJSON PLUGINCONFIGJSON "$PLUGININSTANCE" SETTINGSJSON
+    PLUGINCONFIGJSON="$(spiff merge --json --path "$PLUGININSTANCE" - <<< "$SETTINGSJSON")"
   else
     PLUGINCONFIGJSON="$(cat "$PLUGINCONFIG")"
   fi

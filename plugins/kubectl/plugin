@@ -320,7 +320,7 @@ execute_entry()
       getJSON tmpf files entry
       getJSON tmpc command entry
       if [ -z "$tmpf$tmpc" ]; then
-        fail "entry $i: kubeconfig option must be combined with manifest or command option"
+        fail "entry $i: kubeconfig option must be combined with manifests or command option"
       fi
     fi
   fi
