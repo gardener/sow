@@ -305,7 +305,7 @@ exec_plugin()
 
   if [ -n "${config}" ]; then
     echo "${config}" >"$GENDIR/pluginconfig.json"
-    export PLUGINCONFIG"$GENDIR/pluginconfig.json"
+    export PLUGINCONFIG="$GENDIR/pluginconfig.json"
   else
     export PLUGINCONFIG=
   fi
