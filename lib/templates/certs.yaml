@@ -47,7 +47,7 @@ utilities:
     # generate a secret value, if no default is given
     # the length parameter specifies the length of the generated secret.
     #
-    secret: (( |default,length,update|->utilities.state.valuedata(default,_.templates.secret, false) ))
+    secret: (( |default,length,update|->utilities.state.valuedata(default,_.templates.secret, update) ))
 
     #######################
     # helper funcions
@@ -120,4 +120,4 @@ utilities:
       # as long as spiff does not offer a secret generation
       # a shell exec will be used to generate a new secret value
       #
-      secret: (( &template(input // exec( "bash", "-c", "cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w " length " | head -n 1" )) ))
+      secret: (( &template(input // rand("[:alnum:]", length)) ))

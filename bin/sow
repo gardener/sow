@@ -62,7 +62,6 @@ help()
   found "    -p            also the prepare step"
   found "    -d            also the deploment manifest processing step"
   found "    -P            also the plugin execution step"
-  found "    -s            also the state step"
   found "    -e            also the export step"
   info "  add {<components>}            create a frame for a new $nCOMPONENT"
   found "    -p <product>  add $nCOMPONENT to given product"
@@ -577,7 +576,7 @@ _CMD_show()
 
 CMD_generate()
 {
-  declare -A params=( [c]=component [p]=prepare [d]=deployment [P]=plugins [e]=export [s]=state )
+  declare -A params=( [c]=component [p]=prepare [d]=deployment [P]=plugins [e]=export )
   declare -A opts=( )
   OPT_parse_options params opts "$@"
   shift $(( _cnt - 1 ))
@@ -929,9 +928,12 @@ EOF
 imports: (( &temporary ))
 
 plugins:
+
+state:
+  <<: (( &state(merge none) ))
+
 EOF
     echo "---" > "$COMPDIR/export.yaml"
-    echo "state:" > "$COMPDIR/state.yaml"
   done
 }
 

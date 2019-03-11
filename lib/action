@@ -172,35 +172,36 @@ action_deployment()
   # evaluating deployment.yaml
   ############################
 
-  deploymentstubs=( )
-  deployment=
-
   if [ ${#stubs[@]} -ne 0 ]; then
     verbose "using additional stubs"
     for i in "${stubs[@]}"; do
       verbose "- $i"
     done
   fi
-  if [ -f "$CURRENT/deployment.yaml" ]; then
-    deploymentstubs=( "$CURRENT/deployment.yaml" )
-  fi
-  deploymentstubs=( "${deploymentstubs[@]}" "${stubs[@]}" "$CONFIG" "$GENDIR/import.json")
-  if [ -f "$STATEDIR/state.yaml" ]; then
-      verbose "incorporating previous state"
-      deploymentstubs=("${deploymentstubs[@]}" "$STATEDIR/state.yaml")
-  fi
-  deploymentstubs=("${deploymentstubs[@]}" "$GENDIR/env.json")
 
+  deployment=
+  deploymentstubs=( )
+
+  genstubs=( "${stubs[@]}" "$CONFIG" "$GENDIR/import.json" "$GENDIR/env.json" )
+
+
+  if [ -f "$CURRENT/deployment.yaml" ]; then
+    deploymentstubs=( "$CURRENT/$fACTIONDEF" )
+  fi
+  deploymentstubs=( "${deploymentstubs[@]}" "${genstubs[@]}" )
 
   if contains deployment "${steps[@]}";then 
     verbose "generating effective deployment manifest"
+    if [ -f "$STATEDIR/state.yaml" ]; then
+        verbose "incorporating previous state"
+    fi
     if [ -f "$GENDIR/$fACTIONDEF" ]; then
       cp "$GENDIR/$fACTIONDEF" "$GENDIR/$fACTIONDEF.bak"
     else
       rm -f "$GENDIR/$fACTIONDEF.bak"
     fi
-    debug spiff merge --json "${deploymentstubs[@]}"
-    DEPLOYMENTJSON="$(spiff merge --json "${deploymentstubs[@]}" || fail "processing $fACTIONDEF")"
+    debug spiff merge --json --state "$STATEDIR/state.yaml" "${deploymentstubs[@]}"
+    DEPLOYMENTJSON="$(spiff merge --json --state "$STATEDIR/state.yaml" "${deploymentstubs[@]}" || fail "processing $fACTIONDEF")"
     if [ -z "$DEPLOYMENTJSON" ]; then
       DEPLOYMENTJSON="{}"
     fi
@@ -232,6 +233,8 @@ action_deployment()
     esac
   fi
 
+  handle_state 
+
   ############################
   # cleanup 
   ############################
@@ -244,10 +247,6 @@ action_deployment()
     if [ "$action" = delete ]; then
       exec_configured_plugins cleanup "component.plugins" COMPONENTJSON
     fi
-  fi
-
-  if contains state "${steps[@]}";then 
-    handle_state
   fi
 
   if contains export "${steps[@]}";then 
@@ -389,10 +388,15 @@ handle_exports()
       else
         rm -f "$EXPORTDIR/export.yaml.bak"
       fi
-      debug spiff merge "$CURRENT/export.yaml" "${deploymentstubs[@]}"
-      spiff merge "$CURRENT/export.yaml" "${deploymentstubs[@]}" > "$EXPORTDIR/export.yaml" || fail "processing exports"
+      debug spiff merge "$CURRENT/export.yaml" "$GENDIR/$fACTIONDEF" "${genstubs[@]}"
+      spiff merge "$CURRENT/export.yaml" "$GENDIR/$fACTIONDEF" "${genstubs[@]}" > "$EXPORTDIR/export.yaml" || fail "processing exports"
 
       EXPORTJSON="$(spiff merge --json "$EXPORTDIR/export.yaml" || fail "reading exports")"
+      if [ -f "$EXPORTDIR/export.yaml.bak" ]; then
+        if ! diff "$EXPORTDIR/export.yaml" "$EXPORTDIR/export.yaml.bak" >/dev/null; then
+          warn "exports have changed"
+        fi
+      fi
       _jq_get_value '(.files // empty) | keys[]' <<<"$EXPORTJSON" | while IFS= read -r line; do
         getValue  p "files.$line.path" EXPORTJSON
         if [ -z "$p" ]; then
@@ -415,26 +419,9 @@ handle_exports()
   fi
 }
 
-restore() {
-    if [ -f "$STATEDIR/state.yaml.bak" ]; then
-      cp "$STATEDIR/state.yaml.bak"  "$STATEDIR/state.yaml"
-      rm -f "$STATEDIR/state.new"
-    fi
-    exit 1
-}
-
 handle_state()
 {
-  title updating state
   if [ "$action" != "delete" -a -f "$CURRENT/state.yaml" ]; then
-    if [ -f "$STATEDIR/state.yaml" ]; then
-      cp "$STATEDIR/state.yaml"  "$STATEDIR/state.yaml.bak"
-    else
-      rm -f "$STATEDIR/state.yaml.bak"
-    fi
-    debug spiff merge "$CURRENT/state.yaml" "$GENDIR/$fACTIONDEF"
-    (echo "$DEPLOYMENTJSON" | spiff merge "$CURRENT/state.yaml" - > "$STATEDIR/state.new" || restore)
-    mv "$STATEDIR/state.new" "$STATEDIR/state.yaml"
     if [ -f "$STATEDIR/state.yaml.bak" ]; then
       if ! diff "$STATEDIR/state.yaml.bak" "$STATEDIR/state.yaml" >/dev/null; then
           warn "state has been modified"
