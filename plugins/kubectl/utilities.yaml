@@ -17,40 +17,62 @@ env:
 utilities:
   <<: (( &temporary(merge || ~) ))
   kubectl:
-     templates:
-       kubectl_get:
-        - <<: (( &template ))
-        - kubectl
-        - "--kubeconfig"
-        - (( lookup_file(k,_.env.ROOTDIR).[0] || tempfile(k) ))
-        - "-n"
-        - (( landscape.namespace ))
-        - get
-        - (( t ))
-        - (( o ))
-        - "-o"
-        - "yaml"
-       kubectl_getfield:
-        - <<: (( &template ))
-        - kubectl
-        - "--kubeconfig"
-        - (( lookup_file(k,_.env.ROOTDIR).[0] || tempfile(k) ))
-        - "-n"
-        - (( landscape.namespace ))
-        - get
-        - (( t ))
-        - (( o ))
-        - "-o"
-        - (( "jsonpath=" p "" ))
+    templates:
+      kubectl_get:
+      - <<: (( &template ))
+      - kubectl
+      - "--kubeconfig"
+      - (( lookup_file(k,_.env.ROOTDIR).[0] || tempfile(k) ))
+      - "-n"
+      - (( landscape.namespace ))
+      - get
+      - (( t ))
+      - (( o ))
+      - "-o"
+      - "yaml"
+      kubectl_getfield:
+      - <<: (( &template ))
+      - kubectl
+      - "--kubeconfig"
+      - (( lookup_file(k,_.env.ROOTDIR).[0] || tempfile(k) ))
+      - "-n"
+      - (( landscape.namespace ))
+      - get
+      - (( t ))
+      - (( o ))
+      - "-o"
+      - (( "jsonpath=" p "" ))
 
-       kubectl:
-         <<: (( &template ))
-         kubeconfig: (( config ))
-         manifests: (( read(file, "importmulti") ))
-         values: (( &temporary(settings) ))
+      kubectl:
+        <<: (( &template ))
+        kubeconfig: (( config ))
+        manifests: (( read(file, "importmulti") ))
+        values: (( &temporary(settings) ))
+    
+      kubeconfig:
+        <<: (( &template ))
+        apiVersion: v1
+        kind: Config
+        current-context: (( values.username ))
+        contexts:
+        - context:
+            cluster: current
+            user: (( values.username ))
+          name: (( values.username ))
+        clusters:
+        - cluster:
+            certificate-authority-data: (( base64(values.cacert) ))
+            server: (( values.apiServerUrl ))
+          name: current
+        users:
+        - name: (( values.username))
+          user:
+            client-certificate-data: (( base64(values.cert) ))
+            client-key-data: (( base64(values.key) ))
 
-     generate: (( lambda |file,config,settings|->*_.templates.kubectl ))
+    kubeconfig: (( lambda |values|-> *_.templates.kubeconfig ))
 
-     getField: (( |k,t,o,p|->exec(*_.templates.kubectl_getfield) ))
-     get: (( |k,t,o|->exec(*_.templates.kubectl_get) ))
+    generate: (( lambda |file,config,settings|->*_.templates.kubectl ))
 
+    getField: (( |k,t,o,p|->exec(*_.templates.kubectl_getfield) ))
+    get: (( |k,t,o|->exec(*_.templates.kubectl_get) ))
