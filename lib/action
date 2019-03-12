@@ -394,11 +394,11 @@ handle_exports()
 
       EXPORTJSON="$(spiff merge --json "$EXPORTDIR/export.yaml" || fail "reading exports")"
       _jq_get_value '(.files // empty) | keys[]' <<<"$EXPORTJSON" | while IFS= read -r line; do
-        getValue  p "files.$line.path" EXPORTJSON
+        getValue  p "files[\"$line\"].path" EXPORTJSON
         if [ -z "$p" ]; then
           p="$line"
         fi
-        getValue data "files.$line.data" EXPORTJSON
+        getValue data "files[\"$line\"].data" EXPORTJSON
 
         echo "exporting file $p"
         local file="$EXPORTDIR/$p"
