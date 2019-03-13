@@ -17,7 +17,17 @@ getComponentMeta()
   getJSON $1 "components[\"$2\"]" METAJSON
 }
 
+getTemplateMeta()
+{
+  getJSON $1 "templates[\"$2\"]" METAJSON
+}
+
 getComponentMetaProduct()
+{
+  getValue $1 "product" $2
+}
+
+getTemplateMetaProduct()
 {
   getValue $1 "product" $2
 }

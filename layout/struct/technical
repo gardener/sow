@@ -1,6 +1,8 @@
 
 fCONFIG=landscape.yaml
+dTEMPLATES=templates
 dCOMPONENTS=components
+fTEMPDEF=template.yaml
 fCOMPDEF=component.yaml
 fACTIONDEF=deployment.yaml
 dROOTPRODUCT=product

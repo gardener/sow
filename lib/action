@@ -150,7 +150,13 @@ action_deployment()
   echo "$imports" | jq . > "$GENDIR/import.json"
 
   # evaluate additional stubs
-  _get_value_list slist component.stubs COMPONENTJSON
+  declare -a stubs=( )
+  declare -a slist=( )
+  declare -A stubsrc=( )
+  getValueList slist component.stubs COMPONENTJSON
+  getValue templ component.template COMPONENTJSON
+  addTemplateStubs "$templ"
+
   for i in "${slist[@]}"; do
     local stub
     stub="$(lookupStub "$i")"
@@ -179,15 +185,11 @@ action_deployment()
     done
   fi
 
+
   deployment=
-  deploymentstubs=( )
-
   genstubs=( "${stubs[@]}" "$CONFIG" "$GENDIR/import.json" "$GENDIR/env.json" )
-
-
-  if [ -f "$CURRENT/deployment.yaml" ]; then
-    deploymentstubs=( "$CURRENT/$fACTIONDEF" )
-  fi
+  deploymentstubs=( )
+  getComponentStandardStubs deploymentstubs $fACTIONDEF "$templ"
   deploymentstubs=( "${deploymentstubs[@]}" "${genstubs[@]}" )
 
   if contains deployment "${steps[@]}";then 

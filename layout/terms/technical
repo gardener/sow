@@ -1,5 +1,7 @@
 nTOOL=sow
 nLANDSCAPE=landscape
+nTEMPLATE=template         
+nTEMPLATES=templates
 nCOMPONENT=component
 nCOMPONENTS=components
 nPRODUCT=product

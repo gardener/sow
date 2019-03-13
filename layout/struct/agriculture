@@ -1,6 +1,8 @@
 
 fCONFIG=acre.yaml
+dTEMPLATES=templates
 dCOMPONENTS=species
+fTEMPDEF=template.yaml
 fCOMPDEF=species.yaml
 fACTIONDEF=guide.yaml
 dROOTPRODUCT=crop 

@@ -29,12 +29,12 @@ MAINPRODUCT="<main>"
 source "$SOW/layout/struct/$CFG_LAYOUT"
 source "$SOW/layout/terms/$CFG_TERMS"
 
-determineCurrent()
+_determineCurrent()
 {(
   if [ "$(pwd)" == "$ROOT" ]; then
     return
   fi
-  while [ ! -f $fCOMPDEF ]; do
+  while [ ! -f $1 ]; do
     cd ..
     if [ "$(pwd)" == / ]; then
       return
@@ -46,13 +46,34 @@ determineCurrent()
   pwd
 )}
 
+determineCurrent()
+{
+  local c
+  CURRENT=
+  CURRENTTEMP=
+  c="$(_determineCurrent $fCOMPDEF)"
+  if [ -n "$c" ]; then
+    CURRENT="$c"
+  else
+    c="$(_determineCurrent $fTEMPDEF)"
+    if [ -n "$c" ]; then
+      CURRENTTEMP="$c"
+    fi
+  fi
+}
+
 getProductDir()
 {
   local dir="$1"
-  if [ "$dir" == "$ROOT" ]; then
+  if [ "$dir" = "$ROOT" ]; then
+    echo "$dir/$dROOTPRODUCT"
     return
   fi
-  while [ ! -d "$dir/$dCOMPONENTS" ]; do
+  if [ "$dir" = "$ROOT/$dROOTPRODUCT" ]; then
+    echo "$dir"
+    return
+  fi
+  while [ ! \( -d "$dir/$dCOMPONENTS" -o -d "$dir/$dTEMPLATES" \) ]; do
     if [ "$dir" == "$ROOT" ]; then
       return
     fi
@@ -81,6 +102,14 @@ determineRoot()
   pwd
 )}
 
+getTemplateJSON()
+{
+  TEMPLATEJSON="$(spiff merge --json "$1" "$SOWLIB/templates/component.yaml" "$CONFIG")"
+  if [ -z "$TEMPLATEJSON" ]; then
+    TEMPLATEJSON="{}"
+  fi
+}
+
 getComponentJSON()
 {
   COMPONENTJSON="$(spiff merge --json "$1" "$SOWLIB/templates/component.yaml" "$CONFIG")"
@@ -108,7 +137,7 @@ export GEN="$ROOT/gen"
 export STATE="$ROOT/state"
 export EXPORT="$ROOT/export"
 
-CURRENT="$(determineCurrent)"
+determineCurrent
 if [ -n "$CURRENT" ]; then
   setComponent "$CURRENT"
   PRODUCTDIR="$productdir"
@@ -119,11 +148,22 @@ if [ -n "$CURRENT" ]; then
     COMPONENT="$component"
   fi
 else
-  PRODUCTDIR="$(getProductDir "$(pwd)")"
-  if [ -n "$PRODUCTDIR" ]; then
-    PRODUCT="$(getProductForDir "$PRODUCTDIR")"
+  if [ -n "$CURRENTTEMP" ]; then
+    setTemplate "$CURRENTTEMP"
+    PRODUCTDIR="$productdir"
+    if [ -z "$PRODUCTDIR" ]; then
+      CURRENTTEMP=
+    else
+      PRODUCT="$product"
+      TEMPLATE="$template"
+    fi
   else
-    PRODUCT=
+    PRODUCTDIR="$(getProductDir "$(pwd)")"
+    if [ -n "$PRODUCTDIR" ]; then
+      PRODUCT="$(getProductForDir "$PRODUCTDIR")"
+    else
+      PRODUCT=
+    fi
   fi
 fi
 
