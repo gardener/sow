@@ -90,9 +90,14 @@ fi
 
 declare -A opts=( )
 declare -A params
-params=( [m]=matching [k]=keep [c]=range [a]=all [A]=All [n]=new [v]=verbose [version]="" [dryrun]="" [x]=trace [D]=debug [p]="=$nPRODUCT" [terms]="=" [layout]="=" [X]="=plugin" [S]=stacktrace )
+params=( [m]=matching [k]=keep [c]=range [a]=all [A]=All [n]=new [v]=verbose [version]="" [dryrun]="" [x]=trace [D]=debug [p]="=$nPRODUCT" [terms]="=" [layout]="=" [X]="=plugin" [S]=stacktrace [color]= )
 OPT_parse_options params opts "$@"
 shift $(( _cnt - 1 ))
+
+if [ ${opts[color]+set} ]; then
+  export color_mode=X
+  export color_bold=X
+fi
 
 
 : ${CFG_LAYOUT:=garden}
@@ -540,16 +545,6 @@ setComponent()
   fi
 }
 
-isDeployed()
-{
-  local dir="${COMPONENTS["$1"]}"
-  if [ -z "$dir" -o ! -f "$EXPORT/$1/export.yaml" ]; then
-    return 1
-  fi
-  return 0
-}
-
-
 CMD_list()
 {
   local comps=( )
@@ -991,9 +986,11 @@ _CMD_deploy()
 {
   for c in "$@"; do
     if isDeployed "$c"; then
-      if [ ${opts[new]+set} ]; then
-        confirm "$nCOMPONENT $c already deployed"
-        continue
+      if ! isError "$c"; then
+        if [ ${opts[new]+set} ]; then
+          confirm "$nCOMPONENT $c already deployed"
+          continue
+        fi
       fi
     fi
     confirm "*****************************"

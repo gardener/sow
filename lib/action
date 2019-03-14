@@ -269,8 +269,9 @@ action_deployment()
 
 setState()
 {
-  if [ -n "$deployState" ]; then
-    echo "$deployState" > "$STATE/state,info"
+  errorHandler=( )
+  if [ -n "$deployState" -a -d "$STATE/$COMPONENT" ]; then
+    echo "$deployState" > "$STATE/$COMPONENT/state.info"
   fi
 }
 

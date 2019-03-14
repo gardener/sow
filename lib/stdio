@@ -35,12 +35,12 @@ COLOR_BOLD=$'\e[1m'
 # $1: color
 _start_color()
 {
-  [ "$color_mode" -a -t 1 ] && echo -n "$1" || true
+  [ "$color_mode" -a \( -t 1 -o "$color_mode" = X \) ] && echo -n "$1" || true
 }
 
 _end_color()
 {
-  [ "$color_mode" -a -t 1 ] && echo -n "${COLOR_END}" || true
+  [ "$color_mode" -a \( -t 1 -o "$color_mode" = X \) ] && echo -n "${COLOR_END}" || true
 }
 
 _echo()
@@ -52,7 +52,7 @@ _echo()
     o="-n"
     shift
   fi
-  [ "$color_mode" -a -t 1 ] && echo $o "${c}${color_bold:+$COLOR_BOLD}$*${COLOR_END}"  || echo $o "$@"
+  [ "$color_mode" -a  \( -t 1 -o "$color_mode" = X \) ] && echo $o "${c}${color_bold:+$COLOR_BOLD}$*${COLOR_END}"  || echo $o "$@"
 }
 
 debug()
