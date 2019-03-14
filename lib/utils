@@ -22,9 +22,15 @@ source "$SOWLIB/stdio"
 # standard error handling
 ################################################################################
 
+errorHandler=( )
+
 handle_error()
 {
   x=${1:-$?}
+  if [ ${#errorHandler[@]} -ne 0 ]; then
+    "${errorHandler[@]}"
+  fi
+
   set +x
   if [ -n "$STACKTRACE" ]; then
     warn "ERRCODE $x (subshell $BASH_SUBSHELL) INTEND=$INTENDED_EXIT"

@@ -222,15 +222,19 @@ action_deployment()
   ############################
 
   if contains plugins "${steps[@]}";then 
+    deployState=error
+    errorHandler=( setState aborted)
     case "$action" in
         (deploy)  exec_configured_plugins deploy "plugins" DEPLOYMENTJSON
                   if _is_function "deploy"; then
                      deploy "$@"
-                  fi;;
+                  fi
+                  deployState=deployed;;
         (delete)  if _is_function "delete"; then
                      delete "$@"
                   fi
-                  exec_configured_plugins delete "plugins" DEPLOYMENTJSON;;
+                  exec_configured_plugins delete "plugins" DEPLOYMENTJSON
+                  deployState=deleted;;
         (*) fail "unknown command $action";;
     esac
   fi
@@ -259,6 +263,14 @@ action_deployment()
     if [ "$action" = delete ]; then
       rm_directory_and_cleanup_tree "$GEN" "$GENDIR"
     fi
+  fi
+  setState
+}
+
+setState()
+{
+  if [ -n "$deployState" ]; then
+    echo "$deployState" > "$STATE/state,info"
   fi
 }
 

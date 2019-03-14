@@ -320,6 +320,24 @@ setupLandscape()
 
 }
 
+isDeployed()
+{
+  if [ -f "$STATE/$1/state.info"  ]; then
+    return 0
+  fi
+  return 1
+}
+
+isError()
+{
+  if [ -f "$STATE/$1/state.info"  ]; then
+    if [ "$(cat "$STATE/$1/state.info")" != deployed ]; then
+      return 0
+    fi
+  fi
+  return 1
+}
+
 # $1: target var
 # $2: spec
 lookupTemplates()
@@ -590,6 +608,15 @@ showComponent()
   getComponentMetaProduct prod comp
   getMetaProductDir dir "$prod"
   info "     $nPRODUCT: $prod ($dir)"
+  if isDeployed "$c"; then
+    if isError "$c"; then
+      error "     deployed with error"
+    else
+      confirm "     deployed"
+    fi
+  else
+    info "     not deployed"
+  fi
   getValue templ template comp
   if [ -n "$templ" ]; then
     if [ -n "${TEMPLATES[$templ]}" ]; then
@@ -838,10 +865,22 @@ CMD_order()
   execClosure $opt _CMD_order "$@"
 }
 
+  if isDeployed "$c"; then
+    info "     not deployed"
+  fi
+
 _CMD_order()
 {
   for c in "${@}"; do
-    found "$c"
+    if isDeployed "$c"; then
+      if isError "$c"; then
+        error "$c"
+      else
+        confirm "$c"
+      fi
+    else
+        found "$c"
+    fi
   done
 }
 
