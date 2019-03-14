@@ -17,6 +17,7 @@
 source "$SOWLIB/pluginutils"
 source "$SOWLIB/k8s"
 
+set -eo pipefail
 
 K8S_setKubeConfig "$PLUGININSTANCE" "$dir/kubeconfig"
 
