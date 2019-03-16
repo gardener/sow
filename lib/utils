@@ -592,16 +592,35 @@ lookupFileIn() {
   fi
 }
 
+productDirs() {
+  local p="$PRODUCTDIR"
+  eval "$1=( )"
+
+  while true; do
+    eval "$1=( \"\$p\" \"\${$1[@]}\" )"
+    if [ "$p" = "$ROOTPRODUCTDIR" ]; then
+      return
+    fi
+    p="$(dirname "$(dirname "$p")")"
+  done
+}
+
 lookupFile() {
-  lookupFileIn "$@" "$GENDIR" "$CURRENT" "$PRODUCTDIR" "$ROOTPRODUCTDIR" "$ROOT" "$SOW"
+  local dirs=( )
+  productDirs dirs
+  lookupFileIn "$@" "$GENDIR" "${dirs[@]}" "$CURRENT" "$ROOT" "$SOW"
 }
 
 lookupPlugin() {
-  lookupFileIn -x "plugins/$1/plugin" "$CURRENT" "$PRODUCTDIR" "$ROOTPRODUCTDIR" "$ROOT" "$SOW"
+  local dirs=( )
+  productDirs dirs
+  lookupFileIn -x "plugins/$1/plugin" "${dirs[@]}" "$CURRENT" "$ROOT" "$SOW"
 }
 
 lookupStub() {
-  lookupFileIn "$1" "$CURRENT" "$PRODUCTDIR" "$ROOTPRODUCTDIR" "$ROOT" "$SOW"
+  local dirs=( )
+  productDirs dirs
+  lookupFileIn "$1" "${dirs[@]}" "$CURRENT"  "$ROOT" "$SOW"
 }
 
 ################################################################################

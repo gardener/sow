@@ -123,13 +123,25 @@ a kubernetes cluster.
 │   │   │   └── comp2
 │   │   │       ├── component.yaml
 │   │   │       ├── deployment.yaml
-│   │   │       ├── lib
-│   │   │       │   └── action
+│   │   │       ├── lib       # convention: any kind of library
+│   │   │       │   . 
+│   │   │       │   . 
+│   │   │       │   
+│   │   │       ├── action    # optional: direct plugin code, deploy/delete code
+│   │   │       ├── plugins   # optional: folder for local plugins
 │   │   .       └── export.yaml
 │   │   .
 │   │
+│   ├── lib                   # convention: folder for any kind of libraries
+│   │   ├── sow.sh            # optional sow extension script
+│   │   .
+│   │   .
+│   │
+│   ├── plugins   # optional: folder for plugins provided by product
+│   │
 │   └── greenhouses           # recursively included installation sources
 │       └── nestedproduct     # name as root of the installation source
+│           ├── other product folders (see above)
 │           └── components
 │               ├── testcomp
 │               │   ├── component.yaml

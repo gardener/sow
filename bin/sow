@@ -199,6 +199,11 @@ setupProductMeta()
       setupProductMeta "$d"
     fi
   done
+
+  if [ -f "$1/lib/sow.sh" ]; then
+    debug "sourcing exensions of product $product($reldir)"
+    source "$1/lib/sow.sh" 
+  fi
 }
 
 setupTemplateMeta()
@@ -349,6 +354,10 @@ lookupTemplates()
 {
   local var="$1"
   local spec="$2"
+  if [ "$spec" = all ]; then
+    eval "$var=( \"\${!TEMPLATES[@]}\" )"
+    return 0
+  fi
   local dir
   local cdir
   local c
@@ -402,6 +411,10 @@ lookupComponents()
 {
   local var="$1"
   local spec="$2"
+  if [ "$spec" = all ]; then
+    eval "$var=( \"\${!COMPONENTS[@]}\" )"
+    return 0
+  fi
   local dir
   local cdir
   local c
@@ -884,7 +897,7 @@ CMD_show()
   local data=$(declare -p opts)
   declare -A params
   eval "declare -A opts="${data#*=}
-  params=( [l]=long [m]=matching [a]=all [A]=all [t]=template )
+  params=( [l]=long [m]=matching [a]=all [A]=All [t]=template )
   OPT_parse_options params opts "$@"
   shift $(( _cnt - 1 ))
 

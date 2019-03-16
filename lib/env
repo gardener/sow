@@ -124,6 +124,10 @@ getImports()
 }
 
 
+################################################################################
+# analyse filesytem location 
+# end determine execuition environment
+################################################################################
 
 ROOT="$(determineRoot)"
 if [ -z "$ROOT" ]; then
