@@ -24,7 +24,7 @@ RUN curl -L -o helm-archive.tar.gz https://storage.googleapis.com/kubernetes-hel
     && tar -xzf helm-archive.tar.gz -C helm-extract \
     && cp helm-extract/linux-amd64/helm /usr/bin/helm \
     && rm -rf helm-archive.tar.gz helm-extract
-RUN curl -L -o spiff-archive.zip https://github.com/mandelsoft/spiff/releases/download/v1.3.0-beta-6/spiff_linux_amd64.zip \
+RUN curl -L -o spiff-archive.zip https://github.com/mandelsoft/spiff/releases/download/qual/spiff_linux_amd64.zip \
     && mkdir spiff-extract \
     && unzip -d spiff-extract spiff-archive.zip \
     && cp "spiff-extract/spiff++" /usr/bin/spiff \
