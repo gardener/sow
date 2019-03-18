@@ -118,20 +118,30 @@ a kubernetes cluster.
 │   │   ├── comp1
 │   │   │   ├── component.yaml
 │   │   │   ├── deployment.yaml
-│   │   │   ├── state.yaml
 │   │   │   └── export.yaml
 │   │   ├── nested            # components may be nested
 │   │   │   └── comp2
 │   │   │       ├── component.yaml
 │   │   │       ├── deployment.yaml
-│   │   │       ├── lib
-│   │   │       │   └── action
-│   │   .       ├── state.yaml
+│   │   │       ├── lib       # convention: any kind of library
+│   │   │       │   . 
+│   │   │       │   . 
+│   │   │       │   
+│   │   │       ├── action    # optional: direct plugin code, deploy/delete code
+│   │   │       ├── plugins   # optional: folder for local plugins
 │   │   .       └── export.yaml
 │   │   .
 │   │
+│   ├── lib                   # convention: folder for any kind of libraries
+│   │   ├── sow.sh            # optional sow extension script
+│   │   .
+│   │   .
+│   │
+│   ├── plugins   # optional: folder for plugins provided by product
+│   │
 │   └── greenhouses           # recursively included installation sources
 │       └── nestedproduct     # name as root of the installation source
+│           ├── other product folders (see above)
 │           └── components
 │               ├── testcomp
 │               │   ├── component.yaml
@@ -231,8 +241,8 @@ This document is used to describe the used deployment plugins for a component an
 their configuration settings.
 It is processed by _spiff_ using some stub files.
 
-- the actual execution environment (see below)
 - the last state document (described by `state.yaml`)
+- the actual execution environment (see below)
 - the import information (see below)
 - the effective installation configuration `gen/config.json`
 - additional stubs described by the `component.yaml`
@@ -253,11 +263,17 @@ _sow_ evaluates the dependencies and generates an additional stub file
 containing the exports of all imported components.
 They are stored with their _label_ below the node `imports`.
 
-The effective deployment configuration is stored in the `gen` directory below the
-component folder.
+The effective deployment configuration is stored in the `gen` directory below
+the component folder. The deployment template also declares state fields
+(using the `&state` marker in dynaml) whose content should be kept for the
+next processing. It is automatically added to the stub list as top-level stub.
+If a manual merge should be done with the latest state such a node
+has to disable the auto.merge, also, by adding a `merge none` expression.
+(See state support of [spiff++](https://github.com/mandelsoft/spiff/README.md(#-state-)
 
-It should contain a `plugins` node listing the plugins that should be executed.
-A plugin entry may take additional string arguments and a configuration.
+The generated effective deployment manifest should contain a `plugins` node
+listing the plugins that should be executed.  A plugin entry may take
+additional string arguments and a configuration.
 
 ```yaml
 plugins:
@@ -302,21 +318,14 @@ If the plugin name start with a `-`, its execution is not notified
 on the output. This can be used for the `echo` plugin to
 echo plain multi line text.
 
-### `state.yaml`
-
-This file should describe the information that should be kept
-for subsequent executions
-
-It uses the actual effective processed `deployment.yaml` as
-stub.
-
 ### `export.yaml`
 
 This file should describe the information intended for reuse by other
 components. By convention it should be stored below an `export` node.
 
-It uses the `deployment.yaml` and all the stubs used for its processing as
-stub. As state the state of the actual execution is used.
+It uses the generated effective `deployment.yaml` and all the stubs used for
+its processing as stub. It also contains the actual state, therefore the
+state file is omitted.
 
 If it contains a `files` section the listes files (structure with `path` and
 `data` fields) are written to the components export folder.
@@ -346,17 +355,19 @@ Every component is processed separately.
   The export information of the used components are gathered and aggregated
   into a single import file.
 4. the `deployment.yaml` is processed to determine the concrete
-  plugin sequence and their configuration settings.
+  plugin sequence, their configuration settings (4b) which is stored in the
+  `gen` folder of the component and the actual (maybe updated)
+  state (4a) replacing the old state held in the state folder. Therefore the
+  state support of `spiff++` is used.
 5. the effective deploment configuration is evaluated and the plugin
   set and order is determined. Then the plugins are called in the
   appropriate order together with their dedicated configuration settings.
   The plugins might access and provide own instance specific state information.
   (For example a `terraform.thstate` file).
-6. an optional additional state can be provided by processing an
-  `state.yaml` that will be used as stub for subsequent exection of
-  deployment actions.
-7. the `export.yaml`is processed together with the latest state
-  to generate the interface information for using components.
+6. the `export.yaml`is processed together with the actual generated deployment
+  manifest and all other stubs (except the state.yaml) to generate the
+  contract information for using components. The effective `state.yaml` is
+  stored in the `export` folder of the component.
 
 ## The command
 

@@ -1,6 +1,8 @@
 
 nTOOL=sow
 nLANDSCAPE=acre
+nTEMPLATE=template 
+nTEMPLATES=templates
 nCOMPONENT=species         # species
 nCOMPONENTS=species        # species
 nPRODUCT=greenhouse           # nursery

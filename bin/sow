@@ -62,7 +62,6 @@ help()
   found "    -p            also the prepare step"
   found "    -d            also the deploment manifest processing step"
   found "    -P            also the plugin execution step"
-  found "    -s            also the state step"
   found "    -e            also the export step"
   info "  add {<components>}            create a frame for a new $nCOMPONENT"
   found "    -p <product>  add $nCOMPONENT to given product"
@@ -91,9 +90,14 @@ fi
 
 declare -A opts=( )
 declare -A params
-params=( [m]=matching [k]=keep [c]=range [a]=all [A]=All [n]=new [v]=verbose [version]="" [dryrun]="" [x]=trace [D]=debug [p]="=$nPRODUCT" [terms]="=" [layout]="=" [X]="=plugin" [S]=stacktrace )
+params=( [m]=matching [k]=keep [c]=range [a]=all [A]=All [n]=new [v]=verbose [version]="" [dryrun]="" [x]=trace [D]=debug [p]="=$nPRODUCT" [terms]="=" [layout]="=" [X]="=plugin" [S]=stacktrace [color]= )
 OPT_parse_options params opts "$@"
 shift $(( _cnt - 1 ))
+
+if [ ${opts[color]+set} ]; then
+  export color_mode=X
+  export color_bold=X
+fi
 
 
 : ${CFG_LAYOUT:=garden}
@@ -159,6 +163,15 @@ componentStub()
   jsonAdd $1 "env" "{ $__stub }"
 }
 
+_setupKind()
+{
+  if [ -d "$1/$2" ]; then
+    while IFS= read -r line; do
+      $4 "$line"
+    done < <(find "$1/$2" -name "$3")
+  fi
+}
+
 setupProductMeta()
 {
   local d
@@ -177,15 +190,43 @@ setupProductMeta()
   jsonAdd JMETAPRODS "$product" "{ $jprod }"
 
   debug "found $nPRODUCT $product: $rel"
-  while IFS= read -r line; do
-    setupComponentMeta "$line"
-  done < <(find "$1/$dCOMPONENTS" -name $fCOMPDEF)
+
+  _setupKind "$1" "$dTEMPLATES" "$fTEMPDEF" setupTemplateMeta
+  _setupKind "$1" "$dCOMPONENTS" "$fCOMPDEF" setupComponentMeta
 
   for d in "$1/$dPRODUCTS"/*; do
     if [ -d "$d" ]; then
       setupProductMeta "$d"
     fi
   done
+
+  if [ -f "$1/lib/sow.sh" ]; then
+    debug "sourcing exensions of product $product($reldir)"
+    source "$1/lib/sow.sh" 
+  fi
+}
+
+setupTemplateMeta()
+{
+  local jattr
+
+  setTemplate "${1%/*}"
+  debug "  $template: $reldir ($product)"
+  getTemplateJSON "$line"
+  getValue templ template.template TEMPLATEJSON
+
+  TEMPLATES["$template"]="$reldir"
+
+  jsonAddString jattr dir "$reldir"
+  jsonAddString jattr product "$product"
+  if [ -n "$templ" ]; then
+    if [ -z "${TEMPLATES[$templ]}" ]; then
+      warn "$nTEMPLATE $template ($product) uses non-existent template $templ"
+    fi
+    jsonAddString jattr template "$templ"
+  fi
+
+  jsonAdd JMETATEMPS "$template" "{ $jattr }"
 }
 
 setupComponentMeta()
@@ -199,6 +240,7 @@ setupComponentMeta()
   getComponentJSON "$line"
   declare -A import_map
   getImports import_map COMPONENTJSON
+  getValue templ component.template COMPONENTJSON
   getValue active component.active COMPONENTJSON
   if [ -z "$active" ]; then
     active=true
@@ -209,6 +251,12 @@ setupComponentMeta()
   jsonAdd jattr active "$active"
   jsonAddString jattr dir "$reldir"
   jsonAddString jattr product "$product"
+  if [ -n "$templ" ]; then
+    if [ -z "${TEMPLATES[$templ]}" ]; then
+      warn "$nCOMPONENT $component ($product) uses non-existent template $templ"
+    fi
+    jsonAddString jattr template "$templ"
+  fi
 
   for i in "${!import_map[@]}"; do
     i="$(sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'<<<"$i")"
@@ -230,8 +278,9 @@ setupComponentMeta()
 
 setupLandscape()
 {
-  declare -Ag PRODUCTS COMPONENTS
+  declare -Ag PRODUCTS TEMPLATES COMPONENTS
   local JMETAGRAPH=
+  local JMETATEMPS=
   local JMETACOMPS=
   local JMETAPRODS=
   local JMETA=
@@ -240,6 +289,7 @@ setupLandscape()
 
   jsonAdd JMETA products   "{ $JMETAPRODS }"
   jsonAdd JMETA components "{ $JMETACOMPS }"
+  jsonAdd JMETA templates  "{ $JMETATEMPS }"
   jsonAdd JMETA graph      "{ $JMETAGRAPH }"
 
   METAJSON="{ $JMETA }"
@@ -280,12 +330,91 @@ setupLandscape()
 
 }
 
+isDeployed()
+{
+  if [ -f "$STATE/$1/state.info"  ]; then
+    return 0
+  fi
+  return 1
+}
+
+isError()
+{
+  if [ -f "$STATE/$1/state.info"  ]; then
+    if [ "$(cat "$STATE/$1/state.info")" != deployed ]; then
+      return 0
+    fi
+  fi
+  return 1
+}
+
+# $1: target var
+# $2: spec
+lookupTemplates()
+{
+  local var="$1"
+  local spec="$2"
+  if [ "$spec" = all ]; then
+    eval "$var=( \"\${!TEMPLATES[@]}\" )"
+    return 0
+  fi
+  local dir
+  local cdir
+  local c
+  local __found=( )
+  if [ ${opts[matching]+set} ]; then
+    if [ -d "$2" ]; then
+       if [[ "$1" = /* ]]; then
+         dir="$1"
+       else
+         dir="$(cd "$2"; echo "$PWD")"
+       fi
+       for c in "${!TEMPLATES[@]}"; do
+         cdir="$ROOT/${TEMPLATES["$c"]}"
+         if [[ "$cdir" = $dir/* ]]; then
+           __found=( "${__found[@]}" "$c" )
+         fi
+       done
+    fi
+
+    if [ ${#__found[@]} -eq 0 ]; then
+       for c in "${!TEMPLATES[@]}"; do
+         if [[ "$c" = $2/* || "$2" = "$c" ]]; then
+           __found=( "${__found[@]}" "$c" )
+         fi
+       done
+    fi
+  fi
+
+  if [ ${#__found[@]} -eq 0 ]; then
+    if [ "$2" = . -a -n "$TEMPLATE" ]; then
+       __found=( "$TEMPLATE" )
+    fi
+  fi
+
+  if [ ${#__found[@]} -eq 0 ]; then
+    if [ "$2" != . ]; then
+      c="$(CMDS_resolve_shortcut "$2" "${!TEMPLATES[@]}")"
+      if [ -n "$c" ]; then
+        if [ -n "${TEMPLATES["$c"]}" ]; then
+          __found=( "${__found[@]}" "$c" )
+        fi
+      fi
+    fi
+  fi
+  eval "$var=( \"\${__found[@]}\" )"
+}
+
 # $1: target var
 # $2: spec
 lookupComponents()
 {
   local var="$1"
   local spec="$2"
+  if [ "$spec" = all ]; then
+    eval "$var=( \"\${!COMPONENTS[@]}\" )"
+    return 0
+  fi
   local dir
   local cdir
   local c
@@ -333,27 +462,101 @@ lookupComponents()
   eval "$var=( \"\${__found[@]}\" )"
 }
 
+walkTemplates()
+{
+  local dir
+  local templ
+  local template
+  if [ -n "$1" ]; then
+    dir="${TEMPLATES[$1]}"
+    if [ -n "$reldir" ]; then
+      local product
+      local reldir
+      local productdir
+      setTemplate "$ROOT/$dir"
+      getTemplateJSON "$ROOT/$dir/$fTEMPDEF"
+      "${@:2}"
+      getValue templ template.template TEMPLATEJSON
+      walkTemplates "$templ" "${@:2}"
+    fi
+  fi
+}
+
+#
+# slist     array
+# stubsrc   map
+#
+addTemplateStubs()
+{
+  walkTemplates "$1" _addTemplateStubs
+}
+
+_addTemplateStubs()
+{
+  declare -a tstubs=( )
+  getValueList tstubs template.stubs TEMPLATEJSON
+  if [ ${#tstubs[@]} -ne 0 ]; then
+    for i in "${tstubs[@]}"; do
+      stubsrc["$i"]="template $template"
+    done
+    slist=( "${tstubs[@]}" "${slist[@]}" )
+  fi
+}
+
+#
+# $1: var
+# $2 file
+#
+addTemplateStandardStubs()
+{
+  walkTemplates "$1" _addTemplateStandardStubs "${@:2}"
+}
+
+_addTemplateStandardStubs()
+{
+  if [ -f "$ROOT/$dir/$2" ]; then
+    eval $1="( \"\$ROOT/\$dir/\$2\" \"\${$1[@]}\" )"
+  fi
+}
+
+# $1: var
+# $2: file
+# $3: template
+getComponentStandardStubs()
+{
+  if [ -f "$CURRENT/$2" ]; then
+    eval "$1=( \"\$CURRENT/\$2\" )"
+  else
+    eval $1="( )"
+  fi
+  addTemplateStandardStubs "$3" "$1" "$2"
+}
+
+setTemplate()
+{
+  product=
+  reldir=
+  productdir="$(getProductDir "$1")"
+  template=
+  if [ -n "$productdir" ]; then
+    reldir="${1#$ROOT/}"
+    product="$(getProductForDir "$productdir")"
+    template="${1#$productdir/$dTEMPLATES/}"
+  fi
+}
+
 setComponent()
 {
   product=
   reldir=
   productdir="$(getProductDir "$1")"
+  component=
   if [ -n "$productdir" ]; then
     reldir="${1#$ROOT/}"
     product="$(getProductForDir "$productdir")"
     component="${1#$productdir/$dCOMPONENTS/}"
   fi
 }
-
-isDeployed()
-{
-  local dir="${COMPONENTS["$1"]}"
-  if [ -z "$dir" -o ! -f "$EXPORT/$1/export.yaml" ]; then
-    return 1
-  fi
-  return 0
-}
-
 
 CMD_list()
 {
@@ -403,61 +606,167 @@ showComponent()
   local usedby
   local i
 
-  title " - $c: ${COMPONENTS["$c"]}"
+
+  if [ -n "$2" ]; then
+    title " - $nCOMPONENT $c: ${COMPONENTS["$c"]}"
+  else
+    title " - $c: ${COMPONENTS["$c"]}"
+  fi
   getComponentMeta comp "$c"
   getComponentMetaProduct prod comp
   getMetaProductDir dir "$prod"
   info "     $nPRODUCT: $prod ($dir)"
+  if isDeployed "$c"; then
+    if isError "$c"; then
+      error "     deployed with error"
+    else
+      confirm "     deployed"
+    fi
+  else
+    info "     not deployed"
+  fi
+  getValue templ template comp
+  if [ -n "$templ" ]; then
+    if [ -n "${TEMPLATES[$templ]}" ]; then
+      info "     $nTEMPLATE: $templ (${TEMPLATES[$templ]})"
+    else
+      error "     $nTEMPLATE: $templ (not found)"
+    fi
+    depls=( )
+    getComponentStandardStubs depls $fACTIONDEF "$templ"
+    info "     deployment manifests:"
+    for d in "${depls[@]}"; do
+      echo "      - ${d#$ROOTPRODUCTDIR/}"
+    done
+
+    getComponentStandardStubs depls export.yaml "$templ"
+    info "     export definitions:"
+    for d in "${depls[@]}"; do
+      echo "      - ${d#$ROOTPRODUCTDIR/}"
+    done
+  fi
   getValue active active comp
   info "     active: $active"
-  info "     dependencies:"
-  getJSONList imps "imports" comp
-  for i in "${imps[@]}"; do
-    getValue label label i
-    getValue dep component i
-    found "     - $label: $dep"
-  done
-  getMetaUsedby usedby "$c"
-  info "     direct users:"
-  for i in "${usedby[@]}"; do
-    found "     - $i"
-  done
-  info "     gendir: $GEN/$c"
-  info "     exportdir: $EXPORT/$c"
-  info "     statedir: $STATE/$c"
-  ( # should be part of the landscape meta data, later on
-    CURRENT="$ROOT/${COMPONENTS["$c"]}"
-    setComponent "$CURRENT"
-    getComponentJSON "$CURRENT/$fCOMPDEF"
-    PRODUCTDIR="$productdir"
+  if [ ${opts[long]+set} ]; then
+    info "     dependencies:"
+    getJSONList imps "imports" comp
+    for i in "${imps[@]}"; do
+      getValue label label i
+      getValue dep component i
+      found "     - $label: $dep"
+    done
+    getMetaUsedby usedby "$c"
+    info "     direct users:"
+    for i in "${usedby[@]}"; do
+      found "     - $i"
+    done
+    info "     gendir: $GEN/$c"
+    info "     exportdir: $EXPORT/$c"
+    info "     statedir: $STATE/$c"
+    ( # should be part of the landscape meta data, later on
+      CURRENT="$ROOT/${COMPONENTS["$c"]}"
+      setComponent "$CURRENT"
+      getComponentJSON "$CURRENT/$fCOMPDEF"
+      PRODUCTDIR="$productdir"
 
-    declare -a slist
-    # evaluate additional stubs
-    _get_value_list slist component.stubs COMPONENTJSON
-    if [ ${#slist[@]} -ne 0 ]; then
-      info "     configured deployment stubs:"
-      for i in "${slist[@]}"; do
-        local stub
-        stub="$(lookupStub "$i")"
-        if [ -z "$stub" ]; then
-          error "     - $i (not found)"
-        else
-          found "     - $i (${stub#$ROOT/})"
-        fi
-      done
+      declare -a slist=( )
+      declare -A stubsrc=( )
+
+      # evaluate additional stubs
+      getValueList slist component.stubs COMPONENTJSON
+      if [ ${#slist[@]} -ne 0 ]; then
+        for i in "${slist[@]}"; do
+          stubsrc["$i"]="local"
+        done
+      fi
+      addTemplateStubs "$templ"
+
+      if [ ${#slist[@]} -ne 0 ]; then
+        info "     configured deployment stubs:"
+        for i in "${slist[@]}"; do
+          local stub
+          stub="$(lookupStub "$i")"
+          if [ -z "$stub" ]; then
+            error "     - $i [${stubsrc[$i]}] (not found)"
+          else
+            found "     - $i [${stubsrc[$i]}] (${stub#$ROOT/})"
+          fi
+        done
+      fi
+    )
+    getJSON comp "closures[\"$c\"]" METAJSON
+    getValueList order "order" comp
+    info "     $nTOOL order for required $nCOMPONENTS:"
+    for i in "${order[@]}"; do
+      found "     - $i"
+    done
+    getValueList order "usedorder" comp
+    info "     deletion order for using $nCOMPONENTS:"
+    for i in "${order[@]}"; do
+      found "     - $i"
+    done
+  fi
+}
+
+showTemplate()
+{
+  local c="$1"
+  local comp
+  local prod
+  local dir
+  local i
+
+
+  if [ -n "$2" ]; then
+    title " - $nTEMPLATE $c: ${TEMPLATES["$c"]}"
+  else
+    title " - $c: ${TEMPLATES["$c"]}"
+  fi
+  getTemplateMeta comp "$c"
+  getTemplateMetaProduct prod comp
+  getMetaProductDir dir "$prod"
+  info "     $nPRODUCT: $prod ($dir)"
+  getValue templ template comp
+  if [ -n "$templ" ]; then
+    if [ -n "${TEMPLATES[$templ]}" ]; then
+      info "     $nTEMPLATE: $templ (${TEMPLATES[$templ]})"
+    else
+      error "     $nTEMPLATE: $templ (not found)"
     fi
-  )
-  getJSON comp "closures[\"$c\"]" METAJSON
-  getValueList order "order" comp
-  info "     $nTOOL order for required $nCOMPONENTS:"
-  for i in "${order[@]}"; do
-    found "     - $i"
-  done
-  getValueList order "usedorder" comp
-  info "     deletion order for using $nCOMPONENTS:"
-  for i in "${order[@]}"; do
-    found "     - $i"
-  done
+  fi
+  if [ ${opts[long]+set} ]; then
+    ( # should be part of the landscape meta data, later on
+      CURRENTTEMP="$ROOT/${TEMPLATES["$c"]}"
+      setTemplate "$CURRENTTEMP"
+      getTemplateJSON "$CURRENTTEMP/$fTEMPDEF"
+      PRODUCTDIR="$productdir"
+
+      declare -a slist=( )
+      declare -A stubsrc=( )
+
+      # evaluate additional stubs
+      getValueList slist template.stubs TEMPLATEJSON
+      if [ ${#slist[@]} -ne 0 ]; then
+        for i in "${slist[@]}"; do
+          stubsrc["$i"]="local"
+        done
+      fi
+      addTemplateStubs "$templ"
+
+      if [ ${#slist[@]} -ne 0 ]; then
+        info "     configured template stubs:"
+        for i in "${slist[@]}"; do
+          local stub
+          stub="$(lookupStub "$i")"
+          if [ -z "$stub" ]; then
+            error "     - $i [${stubsrc[$i]}] (not found)"
+          else
+            found "     - $i [${stubsrc[$i]}] (${stub#$ROOT/})"
+          fi
+        done
+      fi
+    )
+  fi
 }
 
 CMD_help()
@@ -492,8 +801,10 @@ CMD_info()
 
   title "$nLANDSCAPE" "$ROOT"
   comps=( )
+  templs=( )
   if [ ${opts[all]+set} ]; then
     comps=( "${!COMPONENTS[@]}" )
+    templs=( "${!TEMPLATES[@]}" )
   else
     if [ -n "$PRODUCTDIR" ]; then
       title "$nPRODUCT" "$PRODUCT (${PRODUCTDIR#$ROOT/})"
@@ -502,25 +813,44 @@ CMD_info()
       resolveComponents comps .
     fi
   fi
-  if [ ${#comps[@]} -ne 0 ]; then
-    title "$nCOMPONENTS:"
-    for c in "${comps[@]}"; do
-      if [ ${opts[long]+set} ]; then
-        showComponent "$c"
-      else
-        found "  - $c: (${COMPONENTS["$c"]})"
-      fi
-    done
-    echo
+  if [ ${#comps[@]} -ne 0 -o ${#templs[@]} -ne 0 ]; then
+    if [ ${#templs[@]} -ne 0 ]; then
+      title "$nTEMPLATES:"
+      for c in "${templs[@]}"; do
+        if [ ${opts[long]+set} ]; then
+          showTemplate "$c"
+        else
+          found "  - $c: (${TEMPLATES["$c"]})"
+        fi
+      done
+    fi
+    if [ ${#comps[@]} -ne 0 ]; then
+      title "$nCOMPONENTS:"
+      for c in "${comps[@]}"; do
+        if [ ${opts[long]+set} ]; then
+          showComponent "$c"
+        else
+          found "  - $c: (${COMPONENTS["$c"]})"
+        fi
+      done
+    fi
     order=( )
     getOrder order "${comps[@]}"
     title "$nTOOL order: ${order[@]}"
   else
     if [ -n "$CURRENT" ]; then
       if [ ${opts[long]+set} ]; then
-        showComponent "$COMPONENT"
+        showComponent "$COMPONENT" X
       else
         title "$nCOMPONENT: $COMPONENT (${COMPONENTS["$COMPONENT"]})"
+      fi
+    else
+      if [ -n "$CURRENTTEMP" ]; then
+        if [ ${opts[long]+set} ]; then
+          showTemplate "$TEMPLATE" X
+        else
+          title "$nTEMPLATE: $TEMPLATE (${TEMPLATES["$TEMPLATE"]})"
+        fi
       fi
     fi
   fi
@@ -543,10 +873,22 @@ CMD_order()
   execClosure $opt _CMD_order "$@"
 }
 
+  if isDeployed "$c"; then
+    info "     not deployed"
+  fi
+
 _CMD_order()
 {
   for c in "${@}"; do
-    found "$c"
+    if isDeployed "$c"; then
+      if isError "$c"; then
+        error "$c"
+      else
+        confirm "$c"
+      fi
+    else
+        found "$c"
+    fi
   done
 }
 
@@ -555,7 +897,7 @@ CMD_show()
   local data=$(declare -p opts)
   declare -A params
   eval "declare -A opts="${data#*=}
-  params=( [l]=long [m]=matching [a]=all [A]=all )
+  params=( [l]=long [m]=matching [a]=all [A]=All [t]=template )
   OPT_parse_options params opts "$@"
   shift $(( _cnt - 1 ))
 
@@ -571,13 +913,17 @@ _CMD_show()
 
   FAILED=
    for c in "$@"; do
-     showComponent "$c"
+     if [ ${opts[template]+set} ]; then
+       showTemplate "$c" X
+     else
+       showComponent "$c" X
+     fi
    done
 }
 
 CMD_generate()
 {
-  declare -A params=( [c]=component [p]=prepare [d]=deployment [P]=plugins [e]=export [s]=state )
+  declare -A params=( [c]=component [p]=prepare [d]=deployment [P]=plugins [e]=export )
   declare -A opts=( )
   OPT_parse_options params opts "$@"
   shift $(( _cnt - 1 ))
@@ -653,9 +999,11 @@ _CMD_deploy()
 {
   for c in "$@"; do
     if isDeployed "$c"; then
-      if [ ${opts[new]+set} ]; then
-        confirm "$nCOMPONENT $c already deployed"
-        continue
+      if ! isError "$c"; then
+        if [ ${opts[new]+set} ]; then
+          confirm "$nCOMPONENT $c already deployed"
+          continue
+        fi
       fi
     fi
     confirm "*****************************"
@@ -753,20 +1101,35 @@ execClosure()
   fi
 
   if [ $# -ne 1 ]; then
-    resolveComponents comps "${@:2}"
+    if [ ${opts[template]+set} ]; then
+      resolveTemplates comps "${@:2}"
+    else
+      resolveComponents comps "${@:2}"
+    fi
   else
+    if [ -n "$CURRENTTEMP" ]; then
+      opts[template]=X
+    fi
     if [ ${opts[All]+set} ]; then
       comps=( )
     else
-      resolveComponents comps .
+      if [ ${opts[template]+set} ]; then
+        resolveTemplates comps .
+      else
+        resolveComponents comps .
+      fi
     fi
   fi
 
-  if [ ${opts[all]+set} ] || [ ${opts[All]+set} ]; then
-    getOrder $opt order "${comps[@]}"
+  if [ ${opts[template]+set} ]; then
+    order=( "${comps[@]}" )
   else
-    local tmp=( )
-    orderComps $opt order "${comps[@]}"
+    if [ ${opts[all]+set} ] || [ ${opts[All]+set} ]; then
+      getOrder $opt order "${comps[@]}"
+    else
+      local tmp=( )
+      orderComps $opt order "${comps[@]}"
+    fi
   fi
 
   $1 "${order[@]}"
@@ -777,26 +1140,41 @@ execClosure()
 # $2+: specs
 resolveComponents()
 {
-  local var="$1"
+  _resolveElements lookupComponents  $nCOMPONENT "${@}"
+}
+
+# $1: var
+# $2+: specs
+resolveTemplates()
+{
+  _resolveElements lookupTemplates  $nTEMPLATE "${@}"
+}
+
+# $1: lookup func
+# $2: kind name
+# $3: var
+# $4+: specs
+_resolveElements()
+{
+  local var="$3"
   local s
   local c
-  shift
 
   local __comps=( )
   local _found=( )
 
   wild=""
-  for s in "$@"; do
-     lookupComponents _found "$s"
+  for s in "${@:4}"; do
+     $1 _found "$s"
      if [ ${#_found[@]} -eq 0 ]; then
        if [ "$s" = . ]; then
          if [ "${opts[match]+set}" ]; then
-           fail "no $nCOMPONENT found"
+           fail "no $2 found"
          else
-           fail "not in a $nCOMPONENT or $nPRODUCT folder"
+           fail "not in a $2 or $nPRODUCT folder"
          fi
        else
-         fail "unknown $nCOMPONENT $s"
+         fail "unknown $2 $s"
        fi
      else
        if [ ${#f_found[@]} -gt 1 ]; then
@@ -867,7 +1245,7 @@ action_edit()
 
 CMD_add()
 {
-  params=( [p]=$nProduct )
+  params=( [p]=$nProduct [t]=template )
   declare -A opts=( )
   OPT_parse_options params opts "$@"
   shift $(( _cnt - 1 ))
@@ -885,26 +1263,41 @@ CMD_add()
   if [ -z "$productdir" ]; then
     fail "please select a $nPRODUCT"
   fi
-  if [ $# -eq 0 ]; then
-      fail "component name required"
+
+  local func=_add_component
+  local kind=$nCOMPONENT
+
+  if [ ${opts[template]+set} ]; then
+    func=_add_template
+    kind=$nTEMPLATE
   fi
 
+  if [ $# -eq 0 ]; then
+      fail "$kind name required"
+  fi
   for c in "$@"; do
-    COMPDIR="$productdir/$dCOMPONENTS/$c"
+    $func "$c"
+  done
+}
 
-    if [ -n "${COMPONENTS["$c"]}" ]; then
-        fail "$nCOMPONENT $c already exists"
-    fi
-    if [ -d "$COMPDIR" ]; then
-        fail "folder for $nCOMPONENT $c already exists"
-    fi
+_add_component()
+{ local c="$1"
 
-    confirm "creating $nCOMPONENT $c in $nPRODUCT $product"
+  COMPDIR="$productdir/$dCOMPONENTS/$c"
 
-    mkdir -p "$COMPDIR/lib"
-    cat <<EOF >"$COMPDIR/action"
+  if [ -n "${COMPONENTS["$c"]}" ]; then
+      fail "$nCOMPONENT $c already exists"
+  fi
+  if [ -d "$COMPDIR" ]; then
+      fail "folder for $nCOMPONENT $c already exists"
+  fi
+
+  confirm "creating $nCOMPONENT $c in $nPRODUCT $product"
+
+  mkdir -p "$COMPDIR/lib"
+  cat <<EOF >"$COMPDIR/action"
 #
-# remove this file if no dediyted deploy or delete code
+# remove this file if no dedicated deploy or delete code
 # is required
 #
 deploy()
@@ -917,22 +1310,72 @@ delete()
   true
 }
 EOF
-    cat <<EOF > "$COMPDIR/component.yaml"
+  cat <<EOF > "$COMPDIR/$fCOMPDEF"
 ---
 component:
   imports: []
 
   stubs: []
 EOF
-    cat <<EOF > "$COMPDIR/deployment.yaml"
+  cat <<EOF > "$COMPDIR/deployment.yaml"
 ---
 imports: (( &temporary ))
 
 plugins:
+
+state:
+  <<: (( &state(merge none) ))
+
 EOF
-    echo "---" > "$COMPDIR/export.yaml"
-    echo "state:" > "$COMPDIR/state.yaml"
-  done
+  echo "---" > "$COMPDIR/export.yaml"
+}
+
+_add_template()
+{ local c="$1"
+
+  TEMPDIR="$productdir/$dTEMPLATES/$c"
+
+  if [ -n "${TEMPLATES["$c"]}" ]; then
+      fail "$nTEMPLATE $c already exists"
+  fi
+  if [ -d "$TEMPDIR" ]; then
+      fail "folder for $nTEMPLATE $c already exists"
+  fi
+
+  confirm "creating $nTEMPLATE $c in $nPRODUCT $product"
+
+  mkdir -p "$TEMPDIR/lib"
+  cat <<EOF >"$TEMPDIR/action"
+#
+# remove this file if no dedicated deploy or delete code
+# is required
+#
+deploy()
+{
+  true
+}
+
+delete()
+{
+  true
+}
+EOF
+  cat <<EOF > "$TEMPDIR/$fTEMPDEF"
+---
+template:
+  stubs: []
+EOF
+  cat <<EOF > "$TEMPDIR/deployment.yaml"
+---
+imports: (( &temporary ))
+
+plugins:
+
+state:
+  <<: (( &state(merge none) ))
+
+EOF
+  echo "---" > "$TEMPDIR/export.yaml"
 }
 
 ###########################################################################

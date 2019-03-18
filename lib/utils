@@ -22,9 +22,15 @@ source "$SOWLIB/stdio"
 # standard error handling
 ################################################################################
 
+errorHandler=( )
+
 handle_error()
 {
   x=${1:-$?}
+  if [ ${#errorHandler[@]} -ne 0 ]; then
+    "${errorHandler[@]}"
+  fi
+
   set +x
   if [ -n "$STACKTRACE" ]; then
     warn "ERRCODE $x (subshell $BASH_SUBSHELL) INTEND=$INTENDED_EXIT"
@@ -586,16 +592,35 @@ lookupFileIn() {
   fi
 }
 
+productDirs() {
+  local p="$PRODUCTDIR"
+  eval "$1=( )"
+
+  while true; do
+    eval "$1=( \"\$p\" \"\${$1[@]}\" )"
+    if [ "$p" = "$ROOTPRODUCTDIR" ]; then
+      return
+    fi
+    p="$(dirname "$(dirname "$p")")"
+  done
+}
+
 lookupFile() {
-  lookupFileIn "$@" "$GENDIR" "$CURRENT" "$PRODUCTDIR" "$ROOTPRODUCTDIR" "$ROOT" "$SOW"
+  local dirs=( )
+  productDirs dirs
+  lookupFileIn "$@" "$GENDIR" "${dirs[@]}" "$CURRENT" "$ROOT" "$SOW"
 }
 
 lookupPlugin() {
-  lookupFileIn -x "plugins/$1/plugin" "$CURRENT" "$PRODUCTDIR" "$ROOTPRODUCTDIR" "$ROOT" "$SOW"
+  local dirs=( )
+  productDirs dirs
+  lookupFileIn -x "plugins/$1/plugin" "${dirs[@]}" "$CURRENT" "$ROOT" "$SOW"
 }
 
 lookupStub() {
-  lookupFileIn "$1" "$CURRENT" "$PRODUCTDIR" "$ROOTPRODUCTDIR" "$ROOT" "$SOW"
+  local dirs=( )
+  productDirs dirs
+  lookupFileIn "$1" "${dirs[@]}" "$CURRENT"  "$ROOT" "$SOW"
 }
 
 ################################################################################

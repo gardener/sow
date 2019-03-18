@@ -40,7 +40,7 @@ fi
 repo_path="$dir/repo"
 
 deploy() {
-    info "Cloning repo $repo ..."
+    info "Cloning repo $repo ($prefix$ref)..."
 
     if [ ! -d "$repo_path" ]; then
         git clone --depth 1 --no-checkout --branch $ref "$repo" "$repo_path"
@@ -48,8 +48,7 @@ deploy() {
     (
         cd "$repo_path"
         git fetch --depth 1 -f origin $prefix$ref
-        git reset $ref 1> /dev/null
-        git checkout $ref "${files[@]}"
+        git checkout FETCH_HEAD "${files[@]}"
     )
 }
 
