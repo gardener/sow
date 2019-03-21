@@ -19,36 +19,54 @@ source "$SOWLIB/pluginutils"
 getRequiredValue repo "repo" PLUGINCONFIGJSON
 getValue tag "tag" PLUGINCONFIGJSON
 getValue branch "branch" PLUGINCONFIGJSON
+getValue commit "commit" PLUGINCONFIGJSON
 getValueList files "files" PLUGINCONFIGJSON
 
-if [ -z "$tag$branch" ]; then
-    fail "either 'tag' or 'branch' attribute is required"
-fi
 if [ -n "$tag" ]; then
-    if [ -n "$branch" ]; then
-        fail "only 'tag' or 'branch' attribute should be given"
-    fi
     # tag is given
     prefix="refs/tags/"
     ref="$tag"
-else
+    mode="tag"
+    cmdmod="--branch $ref"
+elif [ -n "$branch" ]; then
     # branch is given
     prefix=
     ref="$branch"
+    mode="branch"
+    cmdmod="--branch $ref"
+elif [ -n "$commit" ]; then
+    # commit is given
+    prefix=
+    ref="$commit"
+    mode="commit"
+    cmdmod=
+else
+    # nothing is given
+    fail "either 'tag', 'branch', or 'commit' attribute is required"
 fi
 
 repo_path="$dir/repo"
 
 deploy() {
-    info "Cloning repo $repo ($prefix$ref)..."
+    info "Cloning repo $repo ($mode $ref)..."
 
     if [ ! -d "$repo_path" ]; then
-        git clone --depth 1 --no-checkout --branch $ref "$repo" "$repo_path"
+        mkdir -p "$repo_path"
+        (
+            cd "$repo_path"
+            git init
+            git remote add origin "$repo"
+        )
     fi
     (
         cd "$repo_path"
-        git fetch --depth 1 -f origin $prefix$ref
-        git checkout FETCH_HEAD "${files[@]}"
+        if [ $mode = "commit" ]; then
+            git fetch -f -n origin
+            git checkout $ref "${files[@]}"
+        else
+            git fetch --depth 1 -f origin $prefix$ref
+            git checkout FETCH_HEAD "${files[@]}"
+        fi
     )
 }
 
