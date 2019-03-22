@@ -322,6 +322,7 @@ echo plain multi line text.
 
 This file should describe the information intended for reuse by other
 components. By convention it should be stored below an `export` node.
+The file is optional, if there are no exports.
 
 It uses the generated effective `deployment.yaml` and all the stubs used for
 its processing as stub. It also contains the actual state, therefore the
@@ -364,7 +365,7 @@ Every component is processed separately.
   appropriate order together with their dedicated configuration settings.
   The plugins might access and provide own instance specific state information.
   (For example a `terraform.thstate` file).
-6. the `export.yaml`is processed together with the actual generated deployment
+6. the optional `export.yaml` is processed together with the actual generated deployment
   manifest and all other stubs (except the state.yaml) to generate the
   contract information for using components. The effective `state.yaml` is
   stored in the `export` folder of the component.

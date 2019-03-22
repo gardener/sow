@@ -397,12 +397,13 @@ exec_configured_plugins() {
 handle_exports()
 {
   title "generating exports"
-  if [ "$action" != "delete" -a -f "$CURRENT/export.yaml" ]; then
-      if [ -f "$EXPORTDIR/export.yaml" ]; then
-        cp "$EXPORTDIR/export.yaml"  "$EXPORTDIR/export.yaml.bak"
-      else
-        rm -f "$EXPORTDIR/export.yaml.bak"
-      fi
+  if [ "$action" != "delete" ]; then
+    if [ -f "$EXPORTDIR/export.yaml" ]; then
+      cp "$EXPORTDIR/export.yaml"  "$EXPORTDIR/export.yaml.bak"
+    else
+      rm -f "$EXPORTDIR/export.yaml.bak"
+    fi
+    if [ -f "$CURRENT/export.yaml" ]; then
       debug spiff merge "$CURRENT/export.yaml" "$GENDIR/$fACTIONDEF" "${genstubs[@]}"
       spiff merge "$CURRENT/export.yaml" "$GENDIR/$fACTIONDEF" "${genstubs[@]}" > "$EXPORTDIR/export.yaml" || fail "processing exports"
 
@@ -427,6 +428,9 @@ handle_exports()
         fi
         echo "$data" > "$file"
       done
+    else
+      echo "---" > "$EXPORTDIR/export.yaml"
+    fi
   else
     if [ "$action" = "delete" ]; then
       rm_directory_and_cleanup_tree "$EXPORT" "$EXPORTDIR"
