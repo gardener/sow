@@ -18,7 +18,7 @@ RUN apk update && apk add --no-cache bash curl libc6-compat findutils
 RUN apk add git=2.20.1-r0
 RUN apk add terraform=0.11.8-r0
 RUN apk add jq=1.6-r0
-RUN curl -L -o /usr/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/v1.13.3/bin/linux/amd64/kubectl
+RUN curl -L -o /usr/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/v1.13.5/bin/linux/amd64/kubectl
 RUN curl -L -o helm-archive.tar.gz https://storage.googleapis.com/kubernetes-helm/helm-v2.13.0-linux-amd64.tar.gz \
     && mkdir helm-extract \
     && tar -xzf helm-archive.tar.gz -C helm-extract \
