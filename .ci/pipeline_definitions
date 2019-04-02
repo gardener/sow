@@ -19,7 +19,7 @@ sow-release:
       traits:
         release:
           nextversion: 'bump_minor'
-    patch-release-and-image:
+    patch-release:
       traits:
         release:
           nextversion: 'bump_patch'
