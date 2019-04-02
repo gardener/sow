@@ -1,0 +1,25 @@
+sow-release:
+  template: 'default'
+  base_definition:
+    traits:
+      version:
+        preprocess:
+          'finalize'
+      publish:
+        dockerimages:
+          sow:
+            dockerfile: 'docker/Dockerfile'
+            image: 'eu.gcr.io/gardener-project/sow'
+            tag_as_latest: true
+    repo:
+      trigger: false
+    steps: ~
+  variants:
+    minor-release:
+      traits:
+        release:
+          nextversion: 'bump_minor'
+    patch-release-and-image:
+      traits:
+        release:
+          nextversion: 'bump_patch'
