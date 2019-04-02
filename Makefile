@@ -13,4 +13,4 @@
 # limitations under the License.
 
 image:
-	docker build -t sow -f docker/Dockerfile .
+	docker build -t eu.gcr.io/gardener-project/sow -f docker/Dockerfile .
