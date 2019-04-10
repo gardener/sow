@@ -107,7 +107,7 @@ CMDS_list_commands()
 CMDS_help_command()
 {
   if [ "$(type -t "HELP_$1")" == "function" ]; then
-    HELP_$1 | format_help
+    HELP_$1 | CMDS_format_help
   else
     QUIET=X
     if [ "$(type -t "HELP_$1")" == "function" ]; then
