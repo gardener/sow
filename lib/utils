@@ -181,6 +181,14 @@ contains()
   return 1
 }
 
+trim()
+{
+  if [ $# -gt 0 ]; then
+    trim <<<"$1"
+  else
+    sed -e 's/^\s*//' -e 's/\s*$//'
+  fi
+}
 
 join() {
   local sep=$1 IFS=

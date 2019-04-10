@@ -88,3 +88,51 @@ CMDS_execute_command()
 }
 
 
+CMDS_list_commands()
+{
+  QUIET=X
+  declare -F | while read a b c d; do
+    echo "$c"
+  done | grep -e "^CMD_" | sed -e 's/^CMD_\(.*\)/\1/' | sort | while read a; do
+    if ! contains "$a" "${CMDS[@]}"; then
+      if [ "$(type -t "HELP_$a")" == "function" ]; then
+        eval HELP_$a
+      else
+        echo "$a:"
+      fi
+    fi
+  done
+}
+
+CMDS_help_command()
+{
+  if [ "$(type -t "HELP_$1")" == "function" ]; then
+    HELP_$1 | format_help
+  else
+    QUIET=X
+    if [ "$(type -t "HELP_$1")" == "function" ]; then
+      HELP_$1 | CMDS_format_help
+    else
+      echo "no help found for '$1'"
+    fi
+  fi
+}
+
+CMDS_format_help()
+{
+  local txt
+  while IFS=":" read -r a b; do
+    c="$(trim "$a")"
+    if [ "$c" = "$a" ]; then
+      printf -v txt "%-30s %s" "$a" "$b"
+    else
+      printf -v txt "  %-13s %s" "$c" "$b"
+    fi
+    if [ -z "$c" -o "$c" != "$a" ]; then
+      found "  $txt"
+    else
+      info  "  $txt"
+    fi
+  done
+}
+

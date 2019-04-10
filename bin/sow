@@ -31,7 +31,7 @@ help()
   echo
   title "$nTOOL [<options>] [<command>]"
   echo
-  title "options:"
+  title "Options:"
   found "    -m            match given $nCOMPONENT names against file system"
   found "                  or complete list of $nCOMPONENTS"
   found "    -a            complete the $nCOMPONENT set according to their dependencies"
@@ -45,17 +45,17 @@ help()
   found "    --dryrun      dry run (note: not all plugins may support a dry run!)"
   found "    --version     show version"
   echo
-  title "commands:"
-  info "  info  [-aml]                  show info about current location"
+  title "Commands:"
+  info "  info  [-aml]                   show info about current location"
   found "    -l            show extended $nCOMPONENT info"
-  info "  order [-daA] {<components>}   show $nCOMPONENT order"
+  info "  order [-daA] {<components>}    show $nCOMPONENT order"
   found "    -d            deletion order"
-  info "  show [-l]{<components>}       show info about $nCOMPONENTS"
+  info "  show [-l]{<components>}        show info about $nCOMPONENTS"
   found "    -l            show extended $nCOMPONENT info"
-  info "  deploy [-aAnm] {<components>} deploy $nCOMPONENTS"
-  info "  delete [-aAm] {<components>}  delete deployment of $nCOMPONENTS"
+  info "  deploy [-aAnm] {<components>}  deploy $nCOMPONENTS"
+  info "  delete [-aAm] {<components>}   delete deployment of $nCOMPONENTS"
   found "    --force       additional actions from handlers on delete (e.g. deleting state like PVC)"
-  info "  burndown [-aAm] {<components>}  alias for 'delete --force'"
+  info "  burndown [-aAm] {<components>} alias for 'delete --force'"
   info "  generate [-cpdPse] {<components>} execute generation step(s) only"
   info "                                    default is component,prepare,deployment"
   found "    -c            also the component manifest processing step"
@@ -63,9 +63,9 @@ help()
   found "    -d            also the deploment manifest processing step"
   found "    -P            also the plugin execution step"
   found "    -e            also the export step"
-  info "  add {<components>}            create a frame for a new $nCOMPONENT"
+  info "  add {<components>}             create a frame for a new $nCOMPONENT"
   found "    -p <product>  add $nCOMPONENT to given product"
-  info "  vi [-cLegsprl] {<file>}       lookup and edit file"
+  info "  vi [-cLegsprl] {<file>}        lookup and edit file"
   found "    -c <comp>     $nCOMPONENT different from current"
   found "    -L            only list paths"
   found "    -e            export dir"
@@ -74,15 +74,19 @@ help()
   found "    -p            $nPRODUCT dir"
   found "    -r            landscape dir"
   found "    -l            local $nCOMPONENT"
-  info "  diff [-dse] {<components>}    compare old and new version of generated files"
+  info "  diff [-dse] {<components>}     compare old and new version of generated files"
   found "    -e            export file"
   found "    -s            state file"
   found "    -d            deployment file"
+  title "Additional Commands:"
+  CMDS_list_commands | CMDS_format_help
 }
+
 
 source "$SOWLIB/utils"
 source "$SOWLIB/meta"
 source "$SOWLIB/opts"
+source "$SOWLIB/cmd"
 
 if [ -f ~/.${nTOOL}rc ]; then
   source  ~/.${nTOOL}rc
@@ -117,8 +121,6 @@ source "$SOW/layout/terms/$CFG_TERMS"
 case "$1" in
   version) get_version
            exit 0;;
-  help) help
-        exit 0;;
 esac
 
 
@@ -771,7 +773,11 @@ showTemplate()
 
 CMD_help()
 {
-  help
+  if [ $# -eq 0 ]; then
+    help
+  else
+    CMDS_help_command "$1"
+  fi
   exit 0
 }
 
@@ -1422,7 +1428,6 @@ export KEEP_TEMPFILES
 export VERBOSE
 
 source "$SOWLIB/env"
-source "$SOWLIB/cmd"
 source "$SOWLIB/action"
 
 
