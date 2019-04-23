@@ -14,11 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-VERSION=0.1-alpha
-
 SOW="$(cd "$(dirname "${BASH_SOURCE[0]}")/.."; echo "$PWD" )"
 SOWLIB="$SOW/lib"
 TOOL="$(basename "$0")"
+
+VERSION="$(cat "$SOW/VERSION")"
 
 get_version()
 {
@@ -204,7 +204,7 @@ setupProductMeta()
 
   if [ -f "$1/lib/sow.sh" ]; then
     debug "sourcing exensions of product $product($reldir)"
-    source "$1/lib/sow.sh" 
+    source "$1/lib/sow.sh"
   fi
 }
 
