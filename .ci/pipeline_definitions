@@ -3,8 +3,8 @@ sow-release:
   base_definition:
     traits:
       version:
-        preprocess:
-          'finalize'
+        preprocess: 'finalize'
+        inject_effective_version: true
       publish:
         dockerimages:
           sow:
