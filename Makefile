@@ -12,5 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+version := $(shell cat VERSION)
+
 image:
-	docker build -t eu.gcr.io/gardener-project/sow -f docker/Dockerfile .
+	docker build -t eu.gcr.io/gardener-project/sow:$(version) -f docker/Dockerfile .

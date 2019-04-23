@@ -18,6 +18,7 @@
 # Find parent folder of pwd directly under root
 rdir=${PWD#/}
 rdir="/${rdir%%/*}"
+version=$(cat "$(dirname "$0")/../../VERSION")
 
 # Docker run
-docker run --mount type=bind,src="$rdir",dst="/mounted$rdir" --workdir "/mounted$PWD" --rm  -it --user "$(id -u):$(id -g)" "eu.gcr.io/gardener-project/sow:latest" "$@"
+docker run --mount type=bind,src="$rdir",dst="/mounted$rdir" --workdir "/mounted$PWD" --rm  -it --user "$(id -u):$(id -g)" "eu.gcr.io/gardener-project/sow:$version" "$@"
