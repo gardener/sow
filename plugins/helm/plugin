@@ -47,55 +47,61 @@ if [ -z "$src" ]; then
     if [ -f "$source" ]; then
         src="$source"
     else
-        fail "helm source $source not found"
+        fail "helm source '$source' not found"
     fi
 fi
 
-case "$command" in
-    ("upgrade")
-        flags="--install --force --wait"
-        pipe_cmd="cat"
-        ;;
-    ("template")
-        render_path=""
-        flags="--name"
-        pipe_cmd="dump $dir/rendered_charts.yaml"
-        ;;
-    (*)
-        fail "Unknown command for helm: '$command'"
-        ;;
-esac
-
 deploy() {
     info "Running helm $command for $name ..."
-    exec_cmd helm $command $flags $name \
-        --kubeconfig "$KUBECONFIG" \
-        --values "$dir/values.json" \
-        --namespace $namespace \
-        $(echo "${helm_flags_deploy[@]}") \
-        "$src" \
-        | $pipe_cmd
+    case "$command" in
+        upgrade)
+            exec_cmd helm upgrade --install --force --wait $name \
+                --kubeconfig "$KUBECONFIG" \
+                --values "$dir/values.json" \
+                --namespace $namespace \
+                $(echo "${helm_flags_deploy[@]}") \
+                "$src"
+            ;;
+        template)
+            cmd="helm template --name $name --kubeconfig \"$KUBECONFIG\" --values \"$dir/values.json\" --namespace $namespace $(echo "${helm_flags_deploy[@]}") \"$src\""
+            if [ -n "$VERBOSE" ]; then
+                # workaround - exec_cmd can't be used since it uses 'echo' (in verbose mode), which interferes with the pipe.
+                echo "$cmd"
+            fi
+            eval $(echo "$cmd") | dump "$dir/rendered_charts.yaml"
+            ;;
+        *)
+            fail "unknown command for helm: '$command'"
+            ;;
+    esac
 }
 
 delete() {
-    if [ "$command" = "upgrade" ]; then
-        info "Deleting helm deployment for $name"
-        tmp="/tmp/helmplugin$$"
-        exec_cmd helm delete \
-            --kubeconfig "$KUBECONFIG" \
-            --purge \
-            $name \
-            $(echo "${helm_flags_delete[@]}") 2>"$tmp" || {
-                error="$(cat "$tmp")"
-                if [ "$error" != "Error: release: \"$name\" not found" ]; then
-                    rm -f "$tmp"
-                    fail "$error"
-                else
-                    info "release $name already deleted"
-                fi
-            }
-            rm -f "$tmp"
-    fi
+    case "$command" in
+        upgrade)
+            info "Deleting helm deployment for $name"
+            tmp="/tmp/helmplugin$$"
+            exec_cmd helm delete \
+                --kubeconfig "$KUBECONFIG" \
+                --purge \
+                $name \
+                $(echo "${helm_flags_delete[@]}") 2>"$tmp" || {
+                    error="$(cat "$tmp")"
+                    if [ "$error" != "Error: release: \"$name\" not found" ]; then
+                        rm -f "$tmp"
+                        fail "$error"
+                    else
+                        info "release $name already deleted"
+                    fi
+                }
+                rm -f "$tmp"
+            ;;
+        template)
+            ;;
+        *)
+            fail "unknown command for helm: '$command'"
+            ;;
+    esac
 }
 
 case "$1" in
