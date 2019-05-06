@@ -51,30 +51,25 @@ if [ -z "$src" ]; then
     fi
 fi
 
-case "$command" in
-    ("upgrade")
-        flags="--install --force --wait"
-        pipe_cmd="cat"
-        ;;
-    ("template")
-        render_path=""
-        flags="--name"
-        pipe_cmd="dump $dir/rendered_charts.yaml"
-        ;;
-    (*)
-        fail "Unknown command for helm: '$command'"
-        ;;
-esac
-
 deploy() {
     info "Running helm $command for $name ..."
-    exec_cmd helm $command $flags $name \
-        --kubeconfig "$KUBECONFIG" \
-        --values "$dir/values.json" \
-        --namespace $namespace \
-        $(echo "${helm_flags_deploy[@]}") \
-        "$src" \
-        | $pipe_cmd
+    if [ "$command" = "upgrade" ]; then
+        exec_cmd helm upgrade $flags $name \
+            --kubeconfig "$KUBECONFIG" \
+            --values "$dir/values.json" \
+            --namespace $namespace \
+            $(echo "${helm_flags_deploy[@]}") \
+            "$src"
+    elif [ "$command" = "template" ]; then
+        cmd="helm template $flags --kubeconfig \"$KUBECONFIG\" --values \"$dir/values.json\" --namespace $namespace $(echo "${helm_flags_deploy[@]}") \"$src\""
+        if [ -n "$VERBOSE" ]; then
+            # workaround - exec_cmd can't be used since it uses 'echo' (in verbose mode), which interferes with the pipe.
+            echo "$cmd"
+        fi
+        eval $(echo "$cmd") | dump "$dir/rendered_charts.yaml"
+    else
+        fail "Unknown command for helm: '$command'"
+    fi
 }
 
 delete() {
