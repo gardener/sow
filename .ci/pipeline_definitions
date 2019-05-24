@@ -23,3 +23,9 @@ sow-release:
       traits:
         release:
           nextversion: 'bump_patch'
+    dev-image:
+      traits:
+        version:
+          preprocess: 'noop'
+      repo:
+        trigger: true
