@@ -185,9 +185,18 @@ action_deployment()
     done
   fi
 
-
+  #############################
+  # determine component context
+  #############################
+  
+  local compctx=""
+  getJSON compctx "deployment" COMPONENTJSON
   deployment=
   genstubs=( "${stubs[@]}" "$CONFIG" "$GENDIR/import.json" "$GENDIR/env.json" )
+  if [ -n "$compctx" ]; then
+    echo "$compctx" >"$GENDIR/compdeploy.json"
+    genstubs=( "${genstubs[@]}" "$GENDIR/compdeploy.json" )
+  fi
   deploymentstubs=( )
   getComponentStandardStubs deploymentstubs $fACTIONDEF "$templ"
   deploymentstubs=( "${deploymentstubs[@]}" "${genstubs[@]}" )
