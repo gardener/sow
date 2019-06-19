@@ -930,11 +930,12 @@ _CMD_show()
 CMD_generate()
 {
   declare -A params=( [c]=component [p]=prepare [d]=deployment [P]=plugins [e]=export )
-  declare -A opts=( )
-  OPT_parse_options params opts "$@"
+  declare -A tmpopts=( )
+
+  OPT_parse_options params tmpopts "$@"
   shift $(( _cnt - 1 ))
 
-  steps=( "${!opts[@]}" )
+  steps=( "${!tmpopts[@]}" )
 
   if [ ${#steps[@]} -eq 0 ]; then
     steps=( component prepare deployment )
