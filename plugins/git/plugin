@@ -60,6 +60,7 @@ deploy() {
     fi
     (
         cd "$repo_path"
+        git init # workaround for strange "fatal: not a git repository" error
         if [ $mode = "commit" ]; then
             git fetch -f -n origin
             git checkout $ref "${files[@]}"
