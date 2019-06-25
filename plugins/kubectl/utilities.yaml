@@ -24,7 +24,7 @@ utilities:
       - "--kubeconfig"
       - (( lookup_file(k,_.env.ROOTDIR).[0] || tempfile(k) ))
       - "-n"
-      - (( landscape.namespace ))
+      - (( namespace || landscape.namespace ))
       - get
       - (( t ))
       - (( o ))
@@ -36,7 +36,7 @@ utilities:
       - "--kubeconfig"
       - (( lookup_file(k,_.env.ROOTDIR).[0] || tempfile(k) ))
       - "-n"
-      - (( landscape.namespace ))
+      - (( namespace || landscape.namespace ))
       - get
       - (( t ))
       - (( o ))
