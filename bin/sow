@@ -286,6 +286,8 @@ setupLandscape()
   local JMETACOMPS=
   local JMETAPRODS=
   local JMETA=
+  local METACHECKSUM=
+  local OLDMETACHECKSUM=
 
   setupProductMeta "$ROOTPRODUCTDIR" "$MAINPRODUCT"
 
@@ -295,8 +297,17 @@ setupLandscape()
   jsonAdd JMETA graph      "{ $JMETAGRAPH }"
 
   METAJSON="{ $JMETA }"
-  METAJSON="$(spiff merge --json "$SOW/helper/closure.yaml" - "$SOWLIB/templates/graph.yaml" <<<"$METAJSON")"
-  echo "$METAJSON" | jq .>"$META"
+  METACHECKSUM="$(md5sum <<<"$METAJSON")"
+  if [ -f "$META.md5" -a -f "$META" ]; then
+    OLDMETACHECKSUM=$(cat "$META.md5")
+  fi
+  if [ "$METACHECKSUM" = "$OLDMETACHECKSUM" ]; then
+    METAJSON=$(cat "$META")
+  else
+    METAJSON="$(spiff merge --json "$SOW/helper/closure.yaml" - "$SOWLIB/templates/graph.yaml" <<<"$METAJSON")"
+    echo "$METAJSON" | jq .>"$META"
+    echo -n "$METACHECKSUM" >"$META.md5"
+  fi
 
   cycles=( )
   getJSONList cycles cycles METAJSON
