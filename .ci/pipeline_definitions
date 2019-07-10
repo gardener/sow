@@ -14,7 +14,7 @@ sow-release:
     repo:
       trigger: false
     steps: ~
-  variants:
+  jobs:
     minor-release:
       traits:
         release:
