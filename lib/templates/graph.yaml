@@ -26,8 +26,10 @@ utilities:
 
     normcycle: (( |cycle|->($min=_.min(cycle)) min ? sum[cycle|cycle|s,e|->s.[0] == min ? s :(s.[1..] [s.[1]])] :cycle  ))
     cycle: (( |list|->list ? ($elem=list.[length(list) - 1]) _.normcycle(sum[list|[]|s,e|->s ? s [e] :e == elem ? [e] :s]) :list ))
-    norm: (( |model,comp,deps|->($d= _.reverse(uniq(_.reverse(deps.deps)))) { $deps=d, $err=_.cycle(deps.err), $order=_.reverse([comp] d), $missing=_.missing(model,comp) } ))
+    norm: (( |model,comp,deps|->($d= _.maxorder(deps.deps)) { $deps=d, $err=_.cycle(deps.err), $order=_.reverse([comp] d), $missing=_.missing(model,comp) } ))
     reverse: (( |list|->sum[list|[]|s,e|->[e] s] ))
+    maxmap: (( |list|-> sum[list|{}|s,idx,v|-> s {v = idx}] )) 
+    maxorder: (( |list|-> ($mm=_.maxmap(list)) sum[list|[]|s,idx,v|-> s (idx == mm[v] ? v :~~)] ))
 
     invert: (( |graph|->map{graph|c,l|->sum[graph|[]|s,k,v|->contains(v,c) ? s k :s ]} ))
 
