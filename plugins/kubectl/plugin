@@ -80,6 +80,8 @@ setKubeConfig()
 # $1: action
 # $2: kubeconfig file
 # $3: manifest file
+# $4: retry attempts (defaults to 1)
+# $5: retry waiting time in seconds (defaults to 10)
 exec_action()
 {
   local name
@@ -118,9 +120,45 @@ exec_action()
     verbose "    using handler $f"
     $f "$name" "$namespace" "$2" "$3"
   else
+    local attempts=${4:-""}
+    local backoff=${5:-""}
+    if [ -z "$attempts" ]; then
+      attempts=5
+    fi
+    if [ -z "$backoff" ]; then
+      backoff=15
+    fi
     case "$1" in
-      deploy) exec_cmd kubectl --kubeconfig "$2" apply -f "$3";;
-      delete) exec_cmd kubectl --kubeconfig "$2" delete -f "$3";;
+      deploy)
+        while true; do
+          if exec_cmd kubectl --kubeconfig "$2" apply -f "$3" ; then
+            break
+          else
+            attempts=$(( attempts - 1 ))
+            if [[ $attempts -gt 0 ]]; then
+              info "command failed, waiting for $backoff seconds and trying again ($attempts times)"
+              sleep $backoff
+            else
+              fail "kubectl command failed and retry limit reached"
+            fi
+          fi
+        done
+        ;;
+      delete)
+        while true; do
+          if exec_cmd kubectl --kubeconfig "$2" delete -f "$3" ; then
+            break
+          else
+            attempts=$(( attempts - 1 ))
+            if [[ $attempts -gt 0 ]]; then
+              info "command failed, waiting for $backoff seconds and trying again ($attempts times)"
+              sleep $backoff
+            else
+              fail "kubectl command failed and retry limit reached"
+            fi
+          fi
+        done
+        ;;
     esac
   fi
 }
@@ -132,6 +170,8 @@ exec_manifest()
   local kube="$3"
   local index="$4"
   local manifest="$5"
+  local retry_attempts="$6"
+  local retry_wait="$7"
 
   local kubeconfig="$TMP_KUBECONFIG"
   setKubeConfig "$type" "$kube" "$kubeconfig"
@@ -153,13 +193,13 @@ exec_manifest()
 
   if [ "$cmd" == deploy ]; then
     echo "$manifest" | spiff merge - >"$file"
-    exec_action "$cmd" "$kubeconfig" "$file"
+    exec_action "$cmd" "$kubeconfig" "$file" "$retry_attempts" "$retry_wait"
     setjsonvalue deployed 'clusters["'$api'"].kubeconfig' "$(cat "$kubeconfig")"
     setjsonjson deployed 'clusters["'$api'"].manifests["'$objectkey'"]' "$objectentry"
     executed["$api"]="${executed["$api"]} $objectkey"
   else
     if [ -f "$file" ]; then
-      exec_action "$cmd" "$kubeconfig" "$file"
+      exec_action "$cmd" "$kubeconfig" "$file" "$retry_attempts" "$retry_wait"
       deljsonkey deployed 'clusters["'$api'"].manifests["'$objectkey'"]'
     fi
   fi
@@ -262,7 +302,7 @@ save()
 
 execute_manifest()
 {
-  exec_manifest $1 "${kube[@]}" "$i-$2" "$3"
+  exec_manifest $1 "${kube[@]}" "$i-$2" "$3" "$4" "$5"
 }
 
 execute_file()
@@ -276,7 +316,7 @@ execute_file()
     fail "entry $i:$j: $f not found"
   fi
   while IFS= read -r line; do
-    exec_manifest $1 "${kube[@]}" "$i-$j" "$line"
+    exec_manifest $1 "${kube[@]}" "$i-$j" "$line" "$4" "$5"
   done < <(spiff merge --json "$file" | $order)
 }
 
@@ -296,9 +336,11 @@ execute_entry()
     fail no or empty kubeconfig configured
   fi
 
+  getValue retry_attempts "retry.attempts" entry
+  getValue retry_wait "retry.wait" entry
   getJSONList manifests manifests entry
   if [ ${#manifests[@]} -ne 0 ]; then
-    executionLoop "$1" manifests execute_manifest
+    executionLoop "$1" manifests execute_manifest "$retry_attempts" "$retry_wait"
   else
     getValueList files files entry
     getValueList args command entry
@@ -306,7 +348,7 @@ execute_entry()
       if [ ${#args[@]} -ne 0 ]; then
         fail "entry $i: only files or command possible"
       fi
-      executionLoop "$1" files execute_file
+      executionLoop "$1" files execute_file "$retry_attempts" "$retry_wait"
     elif [ ${#args[@]} -ne 0 ]; then
       found "command: ${#args[@]}: ${args[@]}"
       if _is_function "cmd_${args[0]}"; then
