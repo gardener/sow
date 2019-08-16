@@ -32,6 +32,9 @@ getValueList helm_flags_delete "flags.delete" PLUGINCONFIGJSON
 getValue retry_attempts "retry.attempts" PLUGINCONFIGJSON
 getValue retry_wait "retry.wait" PLUGINCONFIGJSON
 
+attempts=${retry_attempts:-5}
+backoff=${retry_wait:-15}
+
 if [ -z "$command" ]; then
   command="${3:-"upgrade"}"
 fi
@@ -57,8 +60,6 @@ deploy() {
     info "Running helm $command for $name ..."
     case "$command" in
         upgrade)
-            local attempts=${retry_attempts:-3}
-            local backoff=${retry_wait:-10}
             while true; do
                 if exec_cmd helm upgrade --install --force --wait $name --kubeconfig "$KUBECONFIG" --values "$dir/values.json" --namespace $namespace $(echo "${helm_flags_deploy[@]}") "$src" ; then
                     break
@@ -92,8 +93,6 @@ delete() {
         upgrade)
             info "Deleting helm deployment for $name"
             tmp="/tmp/helmplugin$$"
-            local attempts=${retry_attempts:-3}
-            local backoff=${retry_wait:-10}
             while true; do
                 if exec_cmd helm delete --kubeconfig "$KUBECONFIG" --purge $name $(echo "${helm_flags_delete[@]}") 2>"$tmp" ; then
                     break

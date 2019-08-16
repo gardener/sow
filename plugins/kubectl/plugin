@@ -123,10 +123,10 @@ exec_action()
     local attempts=${4:-""}
     local backoff=${5:-""}
     if [ -z "$attempts" ]; then
-      attempts=3
+      attempts=5
     fi
     if [ -z "$backoff" ]; then
-      backoff=10
+      backoff=15
     fi
     case "$1" in
       deploy)
