@@ -56,7 +56,7 @@ handle_error()
     if [ ! -x "$INSTALLATION_HANDLER" ]; then
       fail "no executable installation handler script found at '$INSTALLATION_HANDLER'"
     fi
-    exec_cmd "$INSTALLATION_HANDLER" finalize
+    exec_cmd "$INSTALLATION_HANDLER" finalize "$INSTALLATION_HANDLER_CONFIG"
   fi
 }
 

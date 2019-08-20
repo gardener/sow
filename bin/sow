@@ -342,7 +342,8 @@ setupLandscape()
   fi
 
   if [ "$cmd" != "help" ]; then
-    getValue INSTALLATION_HANDLER "meta.installationHandler" CONFIGJSON
+    getValue INSTALLATION_HANDLER "meta.installationHandler.path" CONFIGJSON
+    getJSON INSTALLATION_HANDLER_CONFIG "meta.installationHandler.config" CONFIGJSON
     if [ -n ${INSTALLATION_HANDLER:-""} ]; then
       if [[ "$INSTALLATION_HANDLER" != /* ]]; then
         # relative to root folder if no absolute path given
@@ -351,7 +352,7 @@ setupLandscape()
       if [ ! -x "$INSTALLATION_HANDLER" ]; then
         fail "no executable installation handler script found at '$INSTALLATION_HANDLER'"
       fi
-      exec_cmd "$INSTALLATION_HANDLER" prepare
+      exec_cmd "$INSTALLATION_HANDLER" prepare "$INSTALLATION_HANDLER_CONFIG"
     fi
   fi
 }
