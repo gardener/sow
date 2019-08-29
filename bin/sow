@@ -352,7 +352,11 @@ setupLandscape()
       if [ ! -x "$INSTALLATION_HANDLER" ]; then
         fail "no executable installation handler script found at '$INSTALLATION_HANDLER'"
       fi
-      exec_cmd "$INSTALLATION_HANDLER" prepare "$INSTALLATION_HANDLER_CONFIG"
+      if ! exec_cmd "$INSTALLATION_HANDLER" prepare "$INSTALLATION_HANDLER_CONFIG"; then
+        # prepare failed, execute neither command nor finalize
+        unset INSTALLATION_HANDLER
+        fail "aborting command: prepare failed"
+      fi
     fi
   fi
 }
