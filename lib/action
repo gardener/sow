@@ -248,8 +248,6 @@ action_deployment()
     esac
   fi
 
-  handle_state 
-
   ############################
   # cleanup 
   ############################
@@ -274,6 +272,7 @@ action_deployment()
     fi
   fi
   setState
+  handle_state
 }
 
 setState()
