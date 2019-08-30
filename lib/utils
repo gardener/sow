@@ -51,6 +51,13 @@ handle_error()
     INTENDED_EXIT=X
     DEBUG=
   fi
+
+  if [ "$BASH_SUBSHELL" = "0" ] && [ -n ${INSTALLATION_HANDLER:-""} ]; then
+    if [ ! -x "$INSTALLATION_HANDLER" ]; then
+      fail "no executable installation handler script found at '$INSTALLATION_HANDLER'"
+    fi
+    exec_cmd "$INSTALLATION_HANDLER" finalize "$INSTALLATION_HANDLER_CONFIG"
+  fi
 }
 
 StandardErrorHandling()

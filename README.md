@@ -198,6 +198,19 @@ in the configuration (using _spiff_ features).
 The processing result is stored in `gen/config.json`. This file
 is used as stub for the processing of the other control files.
 
+The `meta.installationHandler` node can be used to configure an installation handler.
+
+```yaml
+meta:
+  installationHandler:
+    path: <path to executable bash file>
+    config: <optional, arbitrary yaml>
+```
+
+If configured, the referenced script will be called once before any call to `sow` (except for `sow version` and `sow help`) with argument `prepare` and once after the `sow` command with argument `finalize`. If the prepare step fails, neither the `sow` command, nor the finalize part will be executed. If the `sow` command fails, the finalize step will still be executed.
+
+Whatever you provide in the (optional) `config` node will be given to the script as a second argument in form of a JSON string.
+
 ### `component.yaml`
 
 This file indicates the root folder of a component. It is used by

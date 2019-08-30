@@ -22,32 +22,49 @@ getValue branch "branch" PLUGINCONFIGJSON
 getValue commit "commit" PLUGINCONFIGJSON
 getValueList files "files" PLUGINCONFIGJSON
 
-if [ -n "$tag" ]; then
-    # tag is given
-    prefix="refs/tags/"
-    ref="$tag"
-    mode="tag"
-    cmdmod="--branch $ref"
-elif [ -n "$branch" ]; then
-    # branch is given
-    prefix=
-    ref="$branch"
-    mode="branch"
-    cmdmod="--branch $ref"
-elif [ -n "$commit" ]; then
-    # commit is given
-    prefix=
-    ref="$commit"
-    mode="commit"
-    cmdmod=
-else
-    # nothing is given
-    fail "either 'tag', 'branch', or 'commit' attribute is required"
-fi
+checkout() {
+    if [ -n "$tag" ]; then
+        # tag is given
+        prefix="refs/tags/"
+        ref="$tag"
+        mode="tag"
+        cmdmod="--branch $ref"
+    elif [ -n "$branch" ]; then
+        # branch is given
+        prefix=
+        ref="$branch"
+        mode="branch"
+        cmdmod="--branch $ref"
+    elif [ -n "$commit" ]; then
+        # commit is given
+        prefix=
+        ref="$commit"
+        mode="commit"
+        cmdmod=
+    else
+        # nothing is given
+        fail "either 'tag', 'branch', or 'commit' attribute is required"
+    fi
 
-repo_path="$dir/repo"
+    repo_path="$dir/repo"
+    version_path="$dir/version.json"
+    version="{\"$mode\": \"$ref\"}"
 
-deploy() {
+    if [ -f "$version_path" ]; then
+        old_version=$(cat "$version_path")
+        if [[ "$old_version" == "$version" ]]; then
+            if missing_file=$(checkFiles "${files[@]}"); then
+                verbose "correct version already checked out, nothing to do"
+                return
+            else
+                verbose "correct version checked out, but file/directory '$missing_file' is missing"
+            fi
+        else
+            verbose "incorrect version checked out"
+        fi
+    fi
+
+    # checkout repository
     info "Cloning repo $repo ($mode $ref)..."
 
     if [ ! -d "$repo_path" ]; then
@@ -69,14 +86,22 @@ deploy() {
             git checkout FETCH_HEAD "${files[@]}"
         fi
     )
+
+    echo -n "$version" > "$version_path"
 }
 
-delete() {
-    true
+# check a list of files whether each file is checked out
+checkFiles() {
+    for file in "$@"; do
+        if [[ ! -e "$repo_path/$file" ]]; then
+            echo "$file"
+            return 1
+        fi
+    done
 }
 
 case "$1" in
-    deploy|prepare) deploy "$@";;
-    delete|cleanup) delete "$@";;
+    deploy|prepare) checkout "$@";;
+    delete|cleanup) checkout "$@";;
     *) fail "unsupported action $1"
 esac

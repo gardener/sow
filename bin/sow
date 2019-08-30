@@ -341,6 +341,24 @@ setupLandscape()
     fail "aborted due to dependency problems"
   fi
 
+  if [ "$cmd" != "help" ]; then
+    getValue INSTALLATION_HANDLER "meta.installationHandler.path" CONFIGJSON
+    getJSON INSTALLATION_HANDLER_CONFIG "meta.installationHandler.config" CONFIGJSON
+    if [ -n ${INSTALLATION_HANDLER:-""} ]; then
+      if [[ "$INSTALLATION_HANDLER" != /* ]]; then
+        # relative to root folder if no absolute path given
+        INSTALLATION_HANDLER="$ROOT/$INSTALLATION_HANDLER"
+      fi
+      if [ ! -x "$INSTALLATION_HANDLER" ]; then
+        fail "no executable installation handler script found at '$INSTALLATION_HANDLER'"
+      fi
+      if ! exec_cmd "$INSTALLATION_HANDLER" prepare "$INSTALLATION_HANDLER_CONFIG"; then
+        # prepare failed, execute neither command nor finalize
+        unset INSTALLATION_HANDLER
+        fail "aborting command: prepare failed"
+      fi
+    fi
+  fi
 }
 
 isDeployed()
