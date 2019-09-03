@@ -43,6 +43,11 @@ _end_color()
   [ "$color_mode" -a \( -t 1 -o "$color_mode" = X \) ] && echo -n "${COLOR_END}" || true
 }
 
+_is_color()
+{
+  [ "$color_mode" -a \( -t 1 -o "$color_mode" = X \) ]
+}
+
 _echo()
 {
   local c="$1"
