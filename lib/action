@@ -305,6 +305,15 @@ _exec_plugin()
 # $1: action
 # $2: spec json
 # $3: variable holding config plugin is takem from (DEPLOYMENT or COMPONENT)
+BUILTIN_pinned()
+{
+  local spec="$2"
+  _exec_plugin_list "$1" args spec "$3"
+}
+
+# $1: action
+# $2: spec json
+# $3: variable holding config plugin is takem from (DEPLOYMENT or COMPONENT)
 exec_plugin()
 {
   local action="$1"
@@ -313,7 +322,15 @@ exec_plugin()
   local dir
   local config
   local args=( )
+
+  debug "executing plugin spec: $spec"
   getValue name name spec
+  if _is_function "BUILTIN_${name}"; then
+    echo $name
+    BUILTIN_${name} "$action" "$spec" "$3"
+    return
+  fi
+
   getValue dir path spec
   getJSON config config spec
   getValueList args args spec
@@ -387,19 +404,29 @@ exec_configured_plugins() {
   if [ "$action" == "delete" ]; then
     order="| reverse"
   fi
-  local plugins=( )
   local msg="executing configured plugins for action $action"
-  getPluginList plugins "$2" "$3" "$order"
+  _exec_plugin_list "$action" "$2" "$3" "$3" "$order"
+  if [ -n "$msg" ]; then
+    verbose "no plugins found for action $action"
+  fi
+}
+
+# $1: action
+# $2: field path
+# $3: doc var with plugin list
+# $4: doc var with content
+# $5: optional order processing
+_exec_plugin_list()
+{
+  local plugins=( )
+  getPluginList plugins "$2" "$3" "$5"
   for p in "${plugins[@]}"; do
     if [ -n "$msg" ]; then
       verbose "$msg"
       msg=
     fi
-    exec_plugin "$1" "$p" "$3"
+    exec_plugin "$1" "$p" "$4"
   done
-  if [ -n "$msg" ]; then
-    verbose "no plugins found for action $action"
-  fi
 }
 
 handle_exports()

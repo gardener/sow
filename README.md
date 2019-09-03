@@ -319,9 +319,6 @@ The denoted path should contain the actual configuration for
 the plugin. This way the same plugin can be called multiple times
 with different settings.
 
-The execution order is taken from the list order and reversed for the deletion
-of a component.
-
 If a `path` is given it is used as sub folder to store information
 for the actual plugin execution, to separate multiple occurrences
 of a plugin in the plugin list. By default the plugin name should be
@@ -330,6 +327,52 @@ used as `dir`
 If the plugin name start with a `-`, its execution is not notified
 on the output. This can be used for the `echo` plugin to
 echo plain multi line text.
+
+#### Execution order
+
+The execution order is taken from the list order and reversed for the deletion
+of a component.
+
+To always use a dediacted order, for example to use a plugin to prepare the 
+input for the ext one, a dedicated order can be pinned for a dedicated sequence
+of plugins. 
+
+This is done done with a built-in plugin called `pinned`. It takes
+a list of regular plugin specifications that are always executed in the given
+order.
+
+#### Built-in Plugins
+
+There is an internal interface for built-in plugin. The `pinned` plugin is an
+example for such a plugin. Built-in plugins could be loaded by the command
+extension mechanism offered by `sow`, or even by the optional action
+script of a component.
+
+A built-in plugin is just a shell function with the prefix `BUILTIN_`.
+It must take three arguments:
+
+$1: the action (deploy, delete, prepare or cleanup)
+$2: the plugin exection specification as json
+$3: the original document declaring the plugin execution
+
+The execution spec includes a `name` field and an optional `args`, `path` or
+`config` field. The simplified spec (see examples above) always provide
+the `args` field, if the execution is configured as list field. It may contain any deep list structure as given by the spec in the original yaml. If a map is
+given the map fields are directly contained in the root level map besides the
+name field.
+
+If the execution config is not part of the plugin execution declaration,
+it is the task of the plugin to access the config in the original document, if
+required. There is no predefined file system based contract as for regular
+plugins.
+
+#### Action Script
+
+A component may contain an `action` script below its root folder.
+This script file is `sourced` by a bash executing an action. It
+may define builtin plugins (using the internal builtin interface) or regular
+plugins just as shell function. Any shell function defined here
+can be called as regularplugin just by its name for the descriptor files.
 
 ### `export.yaml`
 
