@@ -311,6 +311,95 @@ BUILTIN_pinned()
   _exec_plugin_list "$1" args spec "$3"
 }
 
+BUILTIN_unpinned()
+{
+  local order=
+  if [ "$1" == "delete" ]; then
+    order="| reverse"
+  fi
+  local spec="$2"
+  _exec_plugin_list "$1" args spec "$3" "$order"
+}
+
+BUILTIN_parallel()
+{
+  local spec="$2"
+  #_exec_plugin_list "$1" args spec "$3" "$order"
+
+  unset tasks
+  declare -A tasks
+  local plugins=( )
+  local name
+  getPluginList plugins args spec
+
+  LOG_PREFIX="PLUGIN_LOG-${BASHPID}-"
+  BACKGROUND=( )
+
+  local prefix="$GENDIR/$LOG_PREFIX"
+  addLocalCleanupHandler cleanup_parallel
+  for p in "${plugins[@]}"; do
+    header_message msg
+    (
+      if _is_color; then
+        export color_mode=X
+      fi
+      BACKGROUND=( )
+      exec_plugin "$1" "$p" "$3" >"${prefix}-OUT-$BASHPID" 2>"${prefix}-ERR-$BASHPID"
+    )&
+    getValue name name p
+    tasks[$!]="plugin: $name[$1]: $!"
+    BACKGROUND=( "${BACKGROUND[@]}" $! )
+    info "starting task ${tasks[$!]}"
+  done
+  info "waiting for tasks to finish... ($GENDIR)"
+  failed=0
+  for pid in "${!tasks[@]}"; do
+    if ! wait $pid; then
+      cat "${prefix}-OUT-$pid"
+      cat "${prefix}-ERR-$pid" >&2
+      error "task ${tasks[$pid]} failed"
+      failed=$((failed + 1 ))
+    else
+      cat "${prefix}-OUT-$pid"
+      cat "${prefix}-ERR-$pid" >&2
+      info "task ${tasks[$pid]} succeeded"
+    fi
+    rm -f "${prefix}-OUT-$pid" "${prefix}-ERR-$pid"
+  done
+  removeCleanupHandler cleanup_parallel
+  BACKGROUND=( )
+  if [ $failed -gt 0 ]; then
+    fail "$failed parallel task(s) failed (see log(s) above)."
+  fi
+  info "parallel tasks done."
+}
+
+
+cleanup_parallel()
+{
+  if [ ${#BACKGROUND} -gt 0 ]; then
+    info "aborting background processes..."
+    for pid in "${BACKGROUND[@]}"; do
+      kill $pid 2>/dev/null || true
+    done
+  fi
+
+  if [ -n "$LOG_PREFIX" ]; then
+    local msg="pending plugin logs..."
+    for i in "$GENDIR/LOG_PREFIX"*; do
+      if [ -f "$i" ]; then
+        base="$(basename "$i")"
+        if [[ "$base" =~ .*OUT.* ]]; then
+          header_message msg
+          cat "$i"
+          cat "$GENDIR"/$(sed -e "s/OUT/ERR/" <<<"$base") >&2 || true
+        fi
+      fi
+    done
+    rm -f "$GENDIR/$LOG_PREFIX"*
+  fi
+}
+
 # $1: action
 # $2: spec json
 # $3: variable holding config plugin is takem from (DEPLOYMENT or COMPONENT)
@@ -326,7 +415,9 @@ exec_plugin()
   debug "executing plugin spec: $spec"
   getValue name name spec
   if _is_function "BUILTIN_${name}"; then
-    echo $name
+    if [ -z "$hide" ]; then
+      title "Plugin: $name[$action] (builtin)"
+    fi
     BUILTIN_${name} "$action" "$spec" "$3"
     return
   fi
@@ -343,8 +434,8 @@ exec_plugin()
   fi
 
   if [ -n "${config}" ]; then
-    echo "${config}" >"$GENDIR/pluginconfig.json"
-    export PLUGINCONFIG="$GENDIR/pluginconfig.json"
+    export PLUGINCONFIG="$GENDIR/pluginconfig-$$.json"
+    echo "${config}" >"$PLUGINCONFIG"
   else
     export PLUGINCONFIG=
   fi
@@ -377,7 +468,9 @@ exec_plugin()
   fi
 
   rm -f "$GENDIR/deployment.json"
-  rm -f "$GENDIR/pluginconfig.json"
+  if [ -n "$PLUGINCONFIG" ]; then
+    rm -f "$PLUGINCONFIG"
+  fi
 }
 
 
@@ -407,7 +500,7 @@ exec_configured_plugins() {
   local msg="executing configured plugins for action $action"
   _exec_plugin_list "$action" "$2" "$3" "$3" "$order"
   if [ -n "$msg" ]; then
-    verbose "no plugins found for action $action"
+    info "no plugins found for action $action"
   fi
 }
 
@@ -421,10 +514,7 @@ _exec_plugin_list()
   local plugins=( )
   getPluginList plugins "$2" "$3" "$5"
   for p in "${plugins[@]}"; do
-    if [ -n "$msg" ]; then
-      verbose "$msg"
-      msg=
-    fi
+    header_message msg
     exec_plugin "$1" "$p" "$4"
   done
 }

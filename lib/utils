@@ -24,6 +24,10 @@ source "$SOWLIB/stdio"
 
 errorHandler=( )
 
+TMP_NAME=/tmp/sow$$-
+
+declare -Ag cleanup_handlers
+
 handle_error()
 {
   x=${1:-$?}
@@ -58,6 +62,54 @@ handle_error()
     fi
     exec_cmd "$INSTALLATION_HANDLER" finalize "$INSTALLATION_HANDLER_CONFIG"
   fi
+  rm -f "${TMP_NAME}"*
+  
+  local h
+  for h in "${!cleanup_handlers[@]}"; do
+    local p="$(expr "$h" : '.*-\([0-9]*\)')"
+    if [ -n "$p" ]; then
+      if [ $p -ne $BASHPID ]; then
+        continue
+      fi
+      h="$(expr "$h" : '\(.*\)-[0-9]*')"
+    fi
+    $h
+  done
+}
+
+addCleanupHandler()
+{
+  local h
+  for h; do
+    cleanup_handlers[$h]=$((cleanup_handlers[$h] + 1 ))
+  done
+}
+addLocalCleanupHandler()
+{
+  local h
+  for h; do
+    if [ -z "${cleanup_handlers[$h]}" ]; then
+      h="$h-$BASHPID"
+    fi
+    cleanup_handlers[$h]=$((cleanup_handlers[$h] + 1 ))
+  done
+}
+_removeCleanupHandler()
+{
+  local h
+  for h; do
+    cleanup_handlers[$h]=$((cleanup_handlers[$h] - 1 ))
+    if [ ${cleanup_handlers[$h]} -le 0 ]; then
+      unset cleanup_handlers[$h]
+    fi
+  done
+}
+removeCleanupHandler()
+{
+  local h
+  for h; do
+    _removeCleanupHandler "$h" "$h-$BASHPID"
+  done
 }
 
 StandardErrorHandling()
@@ -87,6 +139,14 @@ StandardErrorHandling
 ################################################################################
 # standard utils
 ################################################################################
+
+header_message()
+{
+  if [ -n "${!1}" ]; then
+    info "${!1}"
+    eval $1=
+  fi
+}
 
 add_functions()
 {
