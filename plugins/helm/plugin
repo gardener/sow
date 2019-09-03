@@ -75,12 +75,7 @@ deploy() {
             done
             ;;
         template)
-            cmd="helm template --name $name --kubeconfig \"$KUBECONFIG\" --values \"$dir/values.json\" --namespace $namespace $(echo "${helm_flags_deploy[@]}") \"$src\""
-            if [ -n "$VERBOSE" ]; then
-                # workaround - exec_cmd can't be used since it uses 'echo' (in verbose mode), which interferes with the pipe.
-                echo "$cmd"
-            fi
-            eval $(echo "$cmd") | dump "$dir/rendered_charts.yaml"
+            helm_template
             ;;
         *)
             fail "unknown command for helm: '$command'"
@@ -113,11 +108,21 @@ delete() {
             rm -f "$tmp"
             ;;
         template)
+            helm_template
             ;;
         *)
             fail "unknown command for helm: '$command'"
             ;;
     esac
+}
+
+helm_template() {
+    local cmd="helm template --name $name --kubeconfig \"$KUBECONFIG\" --values \"$dir/values.json\" --namespace $namespace $(echo "${helm_flags_deploy[@]}") \"$src\""
+    if [ -n "$VERBOSE" ]; then
+        # workaround - exec_cmd can't be used since it uses 'echo' (in verbose mode), which interferes with the pipe.
+        echo "$cmd"
+    fi
+    eval $(echo "$cmd") | dump "$dir/rendered_charts.yaml"
 }
 
 case "$1" in
