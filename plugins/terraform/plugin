@@ -32,6 +32,7 @@ delete() {
     if [ -f "$state/terraform.tfstate" ]; then
         (
             cd "$dir"
+            exec_cmd terraform init "$source"
             exec_cmd terraform destroy -force -var-file="$dir/terraform.tfvars" -state="$state/terraform.tfstate" "$source"
         )
     fi
