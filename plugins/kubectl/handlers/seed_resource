@@ -21,3 +21,7 @@ action_delete_Seed_garden_sapcloud_io() {
     done
     exec_cmd kubectl --kubeconfig "$3" delete seed "$1"
 }
+
+action_delete_Seed_core_gardener_cloud() {
+    action_delete_Seed_garden_sapcloud_io "$@"
+}
