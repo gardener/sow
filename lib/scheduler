@@ -1,0 +1,232 @@
+#!/bin/bash
+
+###############################################################################
+# job scheduler
+#
+# uses a user defined schedule definition function
+# $1: request
+#        - alljobs:      set array with a list of all job names
+#        - dependencies: set array with a list of dependencies for given job
+#        - function:     set array with a bash function/command call to start
+#                        the given job
+# $2: array variable to set
+# $3: job name (not for alljobs)
+#
+# The variable MAXPROCS should be set to the maximum number of parallel job
+# executions
+###############################################################################
+
+
+#
+# schedule a set of jobs defined by a nash schedule definition function
+#
+# $1: name of schedule definition function
+#
+SCHEDULE_Execute()
+{
+  declare -A opts=( )
+  declare -A params=( [E]=ignore-errors [K]="=jobkey" [p]="=processors" [d]="=logdir" [s]=silent )
+  OPT_parse_options params opts "$@"
+  shift $(( _cnt - 1 ))
+
+  declare -A activejobs=( )
+
+  local func_def=$1
+  local JOBKEY=job
+  local MAXPROCS=2
+  local LOGDIR=/tmp
+
+  if [ -n "${opts[jobkey]}" ]; then
+    JOBKEY="${opts[jobkey]}"
+  fi
+  if [ -n "${opts[processors]}" ]; then
+    MAXPROCS="${opts[processors]}"
+  fi
+  if [ -n "${opts[logdir]}" ]; then
+    LOGDIR="${opts[logdir]}"
+  fi
+
+
+  local _jobs=( )
+  $func_def alljobs _jobs
+
+  declare -A donejobs=( )
+  declare -A failedjobs=( )
+  declare -A scheduledjobs=( )
+  
+  if [ $MAXPROCS -gt 1 ]; then
+    SCHEDULE_LOG_PREFIX="JOB_LOG-${BASHPID}-"
+    local prefix="$LOGDIR/$SCHEDULE_LOG_PREFIX"
+    local failed=0
+
+    addLocalCleanupHandler __cleanupSchedule
+    _schedule
+
+    while :; do
+      set +e
+      wait -n
+      local s=$?
+      set -e
+      echo "################# got job event $s"
+
+      if [ $s == 127 ]; then
+        break
+      fi
+      for p in ${!activejobs[@]}; do
+        if ! kill -0 $p 2>/dev/null; then
+          _done $p
+        fi
+      done
+    done
+    removeCleanupHandler __cleanupSchedule
+    found "all ${JOBKEY}s done"
+  else
+    while [ ${#donejobs[@]} -lt ${#_jobs[@]} ]; do
+      for j in "${_jobs[@]}"; do
+        if [ -n "${donejobs["$j"]}" -o -n "${failedjobs["$j"]}" ]; then
+          continue
+        fi
+        local _deps=( )
+        $func_def dependencies _deps "$j"
+        for d in "${_deps[@]}" ; do
+          if [ -z "${donejobs["$d"]}" ]; then
+            continue 2
+          fi
+          if ! [ ${opts[ignore-errors]+set} ]; then
+            if [ -n "${failedjobs["$d"]}" ]; then
+              donejobs["$j"]=X
+              failedjobs["$j"]=x
+              continue 2
+            fi
+          fi
+        done
+        local _func=( )
+        $func_def function _func "$j"
+        if [ ${#_func[@]} -eq 0 ]; then
+          donejobs["$j"]=X
+        else
+          id=$(( id + 1 ))
+          local status
+          catch status "${_func[@]}"
+          if [ $status -eq 0 ]; then
+             info $JOBKEY $j succeeded: $?
+          else
+             error $JOBKEY $j failed: $?
+             failedjobs["$j"]=X
+             failed=$(( failed + 1 ))
+          fi
+          donejobs["$j"]=X
+        fi
+      done
+    done
+  fi
+}
+
+
+__cleanupSchedule()
+{
+  local msg="aborting pending jobs..."
+  for pid in "${!activejobs[@]}"; do
+    header_message msg
+    found "  ${activejobs[$pid]} ($pid)"
+    kill $pid >/dev/null 2>&1 || true
+  done
+
+  if [ -n "$SCHEDULE_LOG_PREFIX" ]; then
+    local msg="pending ${JOBKEY} logs..."
+    for i in "$LOGDIR/$SCHEDULE_LOG_PREFIX"*; do
+      if [ -f "$i" ]; then
+        base="$(basename "$i")"
+        if [[ "$base" =~ .*OUT.* ]]; then
+          header_message msg
+          cat "$i"
+          cat "$LOGDIR"/$(sed -e "s/OUT/ERR/" <<<"$base") >&2 || true
+        fi
+      fi
+    done
+    rm -f "$LOGDIR/$SCHEDULE_LOG_PREFIX"*
+  fi
+}
+
+_start()
+{
+  local _func=( )
+  $func_def function _func "$1"
+
+  if [ ${#_func[@]} -gt 0 ]; then
+    id=$(( id + 1 ))
+    (
+      if _is_color; then
+        export color_mode=X
+      fi
+      found starting $JOBKEY $1: $BASHPID: ${_func[@]}
+      "${_func[@]}" >"${prefix}-OUT-$BASHPID" 2>"${prefix}-ERR-$BASHPID"
+    ) &
+
+    activejobs[$!]="$1"
+    scheduledjobs["$1"]=$!
+  else
+    donejobs["$1"]=X
+  fi
+}
+
+_done()
+{
+  local pid=$1
+
+  set +e
+  wait $pid
+  local s=$?
+  set -e
+
+  local j="${activejobs[$1]}"
+  donejobs["$j"]=X
+
+  unset activejobs[$pid]
+
+  local _func=( )
+  $func_def function _func "$j"
+
+  cat "${prefix}-OUT-$pid"
+  cat "${prefix}-ERR-$pid" >&2
+  rm -f "${prefix}-OUT-$pid" "${prefix}-ERR-$pid"
+  if [ $s -ne 0 ]; then
+    error "$JOBKEY $j: $pid (${_func[@]}) failed ($s)"
+    failedjobs["$j"]=X
+    failed=$((failed + 1 ))
+  else
+    found "$JOBKEY $j: $pid (${_func[@]}) succeeded"
+  fi
+  _schedule
+}
+
+_schedule()
+{
+  local cur=-1
+  
+  while [ ${#donejobs[@]} -ne $cur ]; do
+    cur=${#donejobs[@]}
+    for j in "${_jobs[@]}"; do
+      if [ -n "${scheduledjobs[$j]}" ]; then
+        continue
+      fi
+      local _deps=( )
+      $func_def dependencies _deps "$j"
+      for d in "${_deps[@]}" ; do
+        if [ -z "${donejobs[$d]}" ]; then
+          continue 2
+        fi
+        if ! [ ${opts[ignore-errors]+set} ]; then
+          if [ -n "${failedjobs[$d]}" ]; then
+            donejobs["$j"]=X
+            failedjobs["$j"]=x
+            continue 2
+          fi
+        fi
+      done
+      if [ ${#activejobs[@]} -lt $MAXPROCS ]; then
+        _start $j
+      fi
+    done
+  done
+}

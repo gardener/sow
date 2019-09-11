@@ -37,11 +37,21 @@ getMetaProductDir()
   getValue $1 "products[\"$2\"].dir" METAJSON
 }
 
-getMetaUsedby()
+getMetaComponentUsedby()
 {
   if [ "$2" != "" ]; then
     getValueList $1 "usedby[\"$2\"]" METAJSON
   else
     getJSON $1 usedby METAJSON
   fi
+}
+
+getMetaComponentMissing()
+{
+  getValueList $1 "closures[\"$2\"].missing" METAJSON
+}
+
+getMetaComponentImports()
+{
+  getJSONList $1 "components[\"$2\"].imports" METAJSON
 }

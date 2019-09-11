@@ -22,11 +22,29 @@ source "$SOWLIB/stdio"
 # standard error handling
 ################################################################################
 
+catch()
+{
+  set +e
+  (
+    set -e
+    "${@:2}"
+  )
+  eval $1=$?
+  set -e
+}
+
 errorHandler=( )
 
 TMP_NAME=/tmp/sow$$-
 
 declare -Ag cleanup_handlers
+
+handle_interrupt()
+{
+  handle_error
+  cleanup_handlers=( )
+  exit 126
+}
 
 handle_error()
 {
@@ -123,13 +141,13 @@ StandardErrorHandling()
   set -e
   export INTENDED_EXIT=
   trap handle_error ERR EXIT
+  trap handle_interrupt INT
 }
 
 ExecuteInSubshell()
 {
   (
     StandardErrorHandling
-    trap handle_error ERR EXIT
     "$@"
   )
 }

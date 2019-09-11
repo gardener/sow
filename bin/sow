@@ -53,9 +53,12 @@ help()
   info "  show [-l]{<components>}        show info about $nCOMPONENTS"
   found "    -l            show extended $nCOMPONENT info"
   info "  deploy [-aAnm] {<components>}  deploy $nCOMPONENTS"
+  found "    --parallel <n> deploy components with a maximum of n in parallel"
   info "  delete [-aAm] {<components>}   delete deployment of $nCOMPONENTS"
-  found "    --force       additional actions from handlers on delete (e.g. deleting state like PVC)"
+  found "    --force        additional actions from handlers on delete (e.g. deleting state like PVC)"
+  found "    --parallel <n> delete components with a maximum of n in parallel"
   info "  burndown [-aAm] {<components>} alias for 'delete --force'"
+  found "    --parallel <n> delete components with a maximum of n in parallel"
   info "  generate [-cpdPse] {<components>} execute generation step(s) only"
   info "                                    default is component,prepare,deployment"
   found "    -c            also the component manifest processing step"
@@ -87,6 +90,7 @@ source "$SOWLIB/utils"
 source "$SOWLIB/meta"
 source "$SOWLIB/opts"
 source "$SOWLIB/cmd"
+source "$SOWLIB/scheduler"
 
 if [ -f ~/.${nTOOL}rc ]; then
   source  ~/.${nTOOL}rc
@@ -326,7 +330,7 @@ setupLandscape()
   msg="found missing dependencies:"
   for c in "${!COMPONENTS[@]}"; do
     missing=( )
-    getValueList missing "closures[\"$c\"].missing" METAJSON
+    getMetaComponentMissing missing "$c"
     if [ ${#missing[@]} -ne 0 ]; then
       if [ -n "$msg" ]; then
         echo "$msg"
@@ -352,7 +356,9 @@ setupLandscape()
       if [ ! -x "$INSTALLATION_HANDLER" ]; then
         fail "no executable installation handler script found at '$INSTALLATION_HANDLER'"
       fi
-      if ! exec_cmd "$INSTALLATION_HANDLER" prepare "$INSTALLATION_HANDLER_CONFIG"; then
+      local status
+      catch status exec_cmd "$INSTALLATION_HANDLER" prepare "$INSTALLATION_HANDLER_CONFIG"
+      if [ $status -ne 0 ]; then
         # prepare failed, execute neither command nor finalize
         unset INSTALLATION_HANDLER
         fail "aborting command: prepare failed"
@@ -686,7 +692,7 @@ showComponent()
       getValue dep component i
       found "     - $label: $dep"
     done
-    getMetaUsedby usedby "$c"
+    getMetaComponentUsedby usedby "$c"
     info "     direct users:"
     for i in "${usedby[@]}"; do
       found "     - $i"
@@ -1024,7 +1030,7 @@ CMD_deploy()
   local data="$(declare -p opts)"
   declare -A params
   eval "declare -A opts="${data#*=}
-  params=( [m]=matching [a]=all [A]=All [n]=new )
+  params=( [m]=matching [a]=all [A]=All [n]=new [parallel]="=" )
   OPT_parse_options params opts "$@"
   shift $(( _cnt - 1 ))
 
@@ -1033,21 +1039,56 @@ CMD_deploy()
 
 _CMD_deploy()
 {
+  unset todo
+  unset completed
+  declare -A todo
+  declare -A completed
   for c in "$@"; do
+    todo["$c"]=X
     if isDeployed "$c"; then
       if ! isError "$c"; then
         if [ ${opts[new]+set} ]; then
           confirm "$nCOMPONENT $c already deployed"
+          completed["$c"]=X
           continue
         fi
       fi
     fi
-    confirm "*****************************"
-    confirm "*** ${nTOOL}ing $nCOMPONENT $c"
-    ACTION_execute "$c" action_deployment deploy  all
-    confirm "*** $nCOMPONENT $c deployed"
-    confirm
+    if [ $procs -le 1 ]; then
+    __CMD_deploy "$c"
+    fi
   done
+
+  if [ $procs -gt 1 ]; then
+    SCHEDULE_Execute --logdir "$GEN" --jobkey component --processors $procs schedule_deploy
+  fi
+}
+
+__CMD_deploy()
+{
+  confirm "*****************************"
+  confirm "*** ${nTOOL}ing $nCOMPONENT $1"
+  ACTION_execute "$1" action_deployment deploy  all
+  local s=$?
+  if [ $s -eq 0 ]; then
+    confirm "*** $nCOMPONENT $1 deployed"
+    confirm
+  fi
+  return $?
+}
+
+schedule_deploy()
+{
+  case "$1" in
+    alljobs)      eval $2='( "${!todo[@]}" )';;
+    dependencies) getMetaComponentImports $2 "$3";;
+    function)
+      if [ -z "${completed["$3"]}" ]; then
+        eval $2='( __CMD_deploy "$3" )'
+      else
+        eval $2='( )'
+      fi;;
+  esac
 }
 
 CMD_burndown()
@@ -1060,7 +1101,7 @@ CMD_delete()
   local data="$(declare -p opts)"
   declare -A params
   eval "declare -A opts="${data#*=}
-  params=( [m]=matching [a]=all [A]=All [force]="" )
+  params=( [m]=matching [a]=all [A]=All [force]="" [parallel]="=" )
   OPT_parse_options params opts "$@"
   shift $(( _cnt - 1 ))
 
@@ -1076,15 +1117,36 @@ CMD_delete()
 
 _CMD_delete()
 {
-  for c in "$@"; do
-    confirm "*****************************"
-    confirm "*** deleting $nCOMPONENT $c"
-    ACTION_execute "$c" action_deployment delete all
-    confirm "*** $nCOMPONENT $c deleted"
-    confirm
-  done
+  declare -A todo=( )
+  if [ $procs -gt 1 ]; then
+    for c in "$@"; do
+      todo["$c"]=X
+    done
+    SCHEDULE_Execute --logdir "$GEN" --jobkey component --processors $procs schedule_delete
+  else
+    for c in "$@"; do
+      __CMD_delete "$c"
+    done
+  fi
 }
 
+schedule_delete()
+{
+  case "$1" in
+    alljobs)      eval $2='( "${!todo[@]}" )';;
+    dependencies) getMetaComponentUsedby $2 "$3";;
+    function)     eval $2='( __CMD_delete "$3" )';;
+  esac
+}
+
+__CMD_delete()
+{
+  confirm "*****************************"
+  confirm "*** deleting $nCOMPONENT $1"
+  ACTION_execute "$1" action_deployment delete all
+  confirm "*** $nCOMPONENT $1 deleted"
+  confirm
+}
 
 getOrder()
 {
@@ -1136,6 +1198,14 @@ execClosure()
     shift
   fi
 
+  local procs="${opts[parallel]}"
+  if [ -z "$procs" ]; then
+    procs=1
+  else
+    if ! [[ "$procs" =~ ^[0-9]+$ ]] ; then
+       error "option --parallel must be a number"
+    fi
+  fi
   if [ $# -ne 1 ]; then
     if [ ${opts[template]+set} ]; then
       resolveTemplates comps "${@:2}"

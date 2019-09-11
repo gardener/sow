@@ -449,6 +449,7 @@ exec_plugin()
   export PLUGININSTANCE
 
   local hide=
+  local s=0
   if [ -n "$name" ]; then
     if [[ "$name" = -* ]]; then
       name="${name#-}" 
