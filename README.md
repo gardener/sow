@@ -490,7 +490,7 @@ prior to any command execution.
 
 ## Plugins
 
-Plugins are used to exeute the real installation work.
+Plugins are used to execute the real installation work.
 There are several plugins delivered with the tool, but an installation
 source or even a single component might provide own or replace existing plugins.
 

@@ -154,6 +154,10 @@ ExecuteInSubshell()
 
 StandardErrorHandling
 
+if [ -n "$TRACE" ]; then
+  set -x
+fi
+
 ################################################################################
 # standard utils
 ################################################################################
@@ -720,6 +724,22 @@ lookupStub() {
 # manifest
 ################################################################################
 
+# $1: variable
+# $2: name
+# $3: namespace
+# $4: kind
+# $5: apiversion
+getObjectKey()
+{
+  local g
+  getAPIGroupFromVersion g "$5"
+  getObjectKeyByGroup "$1" "$2" "$3" "$4" "$g"
+}
+getObjectKeyByGroup()
+{
+  eval $1='"$(md5sum <<<"$2/$3/$4/$5" | cut -d" "  -f1)"'
+}
+
 # output:
 # name
 # namespace
@@ -732,8 +752,12 @@ getManifestInfo()
 {
   local manifest="$1"
   local msg=""
+  local ord
   if [ -n "$2" ]; then
     msg="$2: "
+  fi
+  if [ -n "$3" ]; then
+    ord="$3"
   fi
 
   namespace=
@@ -752,7 +776,7 @@ getManifestInfo()
     fail "$msg: apiVersion required for manifest"
   fi
 
-  objectkey="$(md5sum <<<"$name/$namespace/$kind/$apiversion" | cut -d' '  -f1)"
+  getObjectKey objectkey "$name" "$namespace" "$kind" "$apiversion"
   objectentry="{}"
   setjsonvalue objectentry name "$name"
   if [ -n "$namespace" ]; then
@@ -797,9 +821,25 @@ getAPIServer()
   kubectl --kubeconfig "$1" config view --minify=true -o jsonpath='{.clusters[*].cluster.server}'
 }
 
-if [ -n "$TRACE" ]; then
-  set -x
-fi
+getAPIGroupFromVersion()
+{
+  local group="${2%/*}"
+  if [ "$group" = "$2" ]; then
+    group=core
+  fi
+  eval $1='"$group"'
+}
+
+getAPIGroupFromManifest()
+{
+  local vers
+  getValue vers apiVersion "$2"
+  if [ -n "$vers" ]; then
+    getAPIGroupFromVersion "$1" "$vers"
+  else
+    getValue "$1" apiGroup "$2"
+  fi
+}
 
 ################################################################################
 # standard plugin utilities

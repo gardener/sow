@@ -19,15 +19,29 @@ source "$SOWLIB/pluginutils"
 manifestdir="$dir/manifests"
 mkdir -p "$manifestdir"
 
+equivalences=( )
+
 loadHandlers()
 {
   local d
   local h
+  local e
+  local equis=( )
+
   for d in "$@"; do
-    if [ -n "$d" -a -d "$d/handlers" ]; then
-      for h in "$d/handlers"/*; do
-        if [ -f "$h" ]; then
-          source "$h"
+    if [ -n "$d" ]; then
+      if [ -d "$d/handlers" ]; then
+        for h in "$d/handlers"/*; do
+          if [ -f "$h" ]; then
+            source "$h"
+          fi
+        done
+      fi
+      for e in "$d"/*.equiv; do
+        if [ -f "$e" ]; then
+          e="$(spiff merge --json "$e")"
+          getJSONList equis equivalences e
+          equivalences=( "${equivalences[@]}" "${equis[@]}" )
         fi
       done
     fi
@@ -57,7 +71,34 @@ fi
 
 cmd_echo()
 {
-  echo "$@"
+  if [ "$2" = "deploy" ]; then
+    if [ "$1" != "deploy" ]; then
+      return
+    fi
+    shift
+  fi
+  echo "${@:2}"
+}
+
+cmd_forget()
+{
+  if [ ${#kube[@]} -eq 0 -o -z "${kube[1]}" ]; then
+    fail no or empty kubeconfig configured
+  fi
+  if [ $# -ne 5 ]; then
+    fail "forget:  <name> <namespace> <kind> <apiVersion>"
+  fi
+  setKubeConfig "${kube[@]}" "$TMP_KUBECONFIG"
+  api="$(getAPIServer "$TMP_KUBECONFIG")"
+
+  local key
+  getObjectKey key "$2" "$3" "$4" "$5"
+  local def
+  getJSON def 'clusters["'$api'"].manifests["'$key'"]' deployed
+  if [ -n "$def" ]; then
+    found "forget $2/$3/$4/$5 for $api ($key)"
+    deljsonkey deployed 'clusters["'$api'"].manifests["'$key'"]'
+  fi
 }
 
 setKubeConfig()
@@ -98,7 +139,7 @@ exec_action()
   local suf
   local ns
   if [ "$group" = "$apiversion" ]; then
-    suf=
+    suf=.
     group=core
   else
     suf=".$group"
@@ -233,8 +274,41 @@ cleanup_deployments()
     for key in "${keys[@]}"; do
       if ! contains "$key" "${cur[@]}"; then
         local objectentry
+        local name
+        local namespace
+        local kind
+        local apiversion
+        local apigroup
+
         getJSON objectentry 'clusters["'"$api"'"].manifests["'"$key"'"]' deployed
         getManifestInfoFromEntry
+        getAPIGroupFromVersion apigroup "$apiversion"
+
+        # compatibility handling: migrate to new key structure
+        local new
+        getObjectKey new "$name" "$namespace" "$kind" "$apiversion"
+        if contains "$new" "${cur[@]}"; then
+            found "  migrating deployed object $name/$namespace/$kind/$apigroup to new key structure"
+            deljsonkey deployed 'clusters["'"$api"'"].manifests["'"$key"'"]'
+            continue 2
+        fi
+
+        local alt=( )
+        getEquivalences alt "$apiversion" "$kind"
+
+        for a in "${alt[@]}"; do
+          local altkey
+          local altkind
+          local altgroup
+          getAPIGroupFromManifest altgroup a
+          getValue altkind kind a
+          getObjectKeyByGroup altkey "$name" "$namespace" "$altkind" "$altgroup"
+          if contains "$altkey" "${cur[@]}"; then 
+            found "  migrating deployed object $name/$namespace from $kind/$apigroup to $altkind/$altgroup"
+            deljsonkey deployed 'clusters["'"$api"'"].manifests["'"$key"'"]'
+            continue 2
+          fi
+        done
 
         if [ -n "$namespace" ]; then
           names[$key]="$kind($apiversion): $namespace/$name"
@@ -300,6 +374,47 @@ save()
   fi
 }
 
+showEquivalences()
+{
+  local e
+  local e
+  if [ ${#equis[@]} -gt 0 ]; then
+     found "using equivalences:"
+     for l in "${equis[@]}"; do
+       local prefix="* -"
+       local list=( )
+       getJSONList list "" l
+       for e in "${list[@]}"; do
+         echo "$prefix $e"
+         prefix="  -"
+       done
+     done
+  fi
+}
+
+getEquivalences()
+{
+  eval $1='( )'
+  local curgrp
+  getAPIGroupFromVersion curgrp "$2"
+  for l in "${equis[@]}"; do
+    local list=( )
+    getJSONList list "" l
+    local cnt=0
+    for e in "${list[@]}"; do
+      local apigroup
+      local kind
+      getAPIGroupFromManifest apigroup e
+      getValue kind kind e
+      if [ "$curgrp" == "$apigroup" -a "$3" == "$kind" ]; then
+        eval $1='( ${list[@]:0:$cnt} ${list[@]:$((cnt + 1))} )'
+        return
+      fi
+      cnt=$((cnt + 1))
+    done
+  done
+}
+
 execute_manifest()
 {
   exec_manifest $1 "${kube[@]}" "$i-$2" "$3" "$4" "$5"
@@ -332,14 +447,24 @@ execute_entry()
   else
     nested=X
   fi
-  if [ ${#kube[@]} -eq 0 -o -z "${kube[1]}" ]; then
-    fail no or empty kubeconfig configured
-  fi
+
+  local retry_attempts
+  local retry_wait
+  local files=( )
+  local args=( )
+  local lequis=( )
+  local manifests=( )
 
   getValue retry_attempts "retry.attempts" entry
   getValue retry_wait "retry.wait" entry
   getJSONList manifests manifests entry
+  getJSONList lequis equivalences entry
+  equis=( "${equis[@]}" "${lequis[@]}" )
+
   if [ ${#manifests[@]} -ne 0 ]; then
+    if [ ${#kube[@]} -eq 0 -o -z "${kube[1]}" ]; then
+      fail no or empty kubeconfig configured
+    fi
     executionLoop "$1" manifests execute_manifest "$retry_attempts" "$retry_wait"
   else
     getValueList files files entry
@@ -347,6 +472,9 @@ execute_entry()
     if [ ${#files[@]} -ne 0 ]; then
       if [ ${#args[@]} -ne 0 ]; then
         fail "entry $i: only files or command possible"
+      fi
+      if [ ${#kube[@]} -eq 0 -o -z "${kube[1]}" ]; then
+        fail no or empty kubeconfig configured
       fi
       executionLoop "$1" files execute_file "$retry_attempts" "$retry_wait"
     elif [ ${#args[@]} -ne 0 ]; then
@@ -372,11 +500,14 @@ execute()
 {
   trap save EXIT ERR 2
   declare -A executed
-  deployed="{}"
+  local deployed="{}"
+  local equis=( "${equivalences[@]}" )
+
   if [ -f "$state/deployed.json" ]; then
     deployed="$(cat "$state/deployed.json")"
   fi
   executionLoop "$1" MANIFESTS execute_entry a
+  showEquivalences
   cleanup_deployments
   save
 }
