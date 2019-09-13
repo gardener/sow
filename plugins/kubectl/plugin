@@ -15,6 +15,7 @@
 # limitations under the License.
 
 source "$SOWLIB/pluginutils"
+source "$PLUGIN/lib/k8s"
 
 manifestdir="$dir/manifests"
 mkdir -p "$manifestdir"
@@ -89,7 +90,7 @@ cmd_forget()
     fail "forget:  <name> <namespace> <kind> <apiVersion>"
   fi
   setKubeConfig "${kube[@]}" "$TMP_KUBECONFIG"
-  api="$(getAPIServer "$TMP_KUBECONFIG")"
+  api="$(getAPIServerFromKubeconfig "$TMP_KUBECONFIG")"
 
   local key
   getObjectKey key "$2" "$3" "$4" "$5"
@@ -216,7 +217,7 @@ exec_manifest()
 
   local kubeconfig="$TMP_KUBECONFIG"
   setKubeConfig "$type" "$kube" "$kubeconfig"
-  api="$(getAPIServer "$kubeconfig")"
+  api="$(getAPIServerFromKubeconfig "$kubeconfig")"
   ord="${#executed["$api"]}"
 
   getManifestInfo "$manifest" "entry $index" "$ord"

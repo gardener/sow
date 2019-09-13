@@ -1,0 +1,146 @@
+#!/usr/bin/env bash
+#
+# Copyright 2019 Copyright (c) 2019 SAP SE or an SAP affiliate company. All rights reserved. This file is licensed under the Apache Software License, v. 2 except as noted otherwise in the LICENSE file.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+################################################################################
+# general
+################################################################################
+
+# $1: variable
+# $2: name
+# $3: namespace
+# $4: kind
+# $5: apiversion
+getObjectKey()
+{
+  local g
+  getAPIGroupFromVersion g "$5"
+  getObjectKeyByGroup "$1" "$2" "$3" "$4" "$g"
+}
+getObjectKeyByGroup()
+{
+  eval $1='"$(md5sum <<<"$2/$3/$4/$5" | cut -d" "  -f1)"'
+}
+
+################################################################################
+# kubeconfig
+################################################################################
+
+getAPIServerFromKubeconfig()
+{
+  kubectl --kubeconfig "$1" config view --minify=true -o jsonpath='{.clusters[*].cluster.server}'
+}
+
+################################################################################
+# manifest
+################################################################################
+
+# output:
+# name
+# namespace
+# kind
+# apiversion
+# objectkey
+# objectentry
+getManifestInfo()
+{
+  local manifest="$1"
+  local msg=""
+  local ord
+  if [ -n "$2" ]; then
+    msg="$2: "
+  fi
+  if [ -n "$3" ]; then
+    ord="$3"
+  fi
+
+  namespace=
+  getValue kind kind manifest
+  getValue apiversion apiVersion manifest
+  getValue name metadata.name manifest
+  getValue namespace metadata.namespace manifest
+
+  if [ -z "$name" ]; then
+    fail "$msg: name required for manifest"
+  fi
+  if [ -z "$kind" ]; then
+    fail "$msg: kind required for manifest"
+  fi
+  if [ -z "$apiversion" ]; then
+    fail "$msg: apiVersion required for manifest"
+  fi
+
+  getObjectKey objectkey "$name" "$namespace" "$kind" "$apiversion"
+  objectentry="{}"
+  setjsonvalue objectentry name "$name"
+  if [ -n "$namespace" ]; then
+    setjsonvalue objectentry namespace "$namespace"
+  fi
+  setjsonvalue objectentry kind "$kind"
+  setjsonvalue objectentry apiVersion "$apiversion"
+  if [ -n "$ord" ]; then
+    setjsonvalue objectentry index "$ord"
+  else
+    deljsonkey objectentry index
+  fi
+}
+
+getManifestInfoFromEntry()
+{
+  local v="${1:-objectentry}"
+  namespace=
+  kind=
+  name=
+  apiversion=
+  ord=
+  getValue kind kind $v
+  getValue apiversion apiVersion $v
+  getValue name name $v
+  getValue namespace namespace $v
+  getValue ord index $v
+
+  manifest="{}"
+
+  setjsonvalue manifest kind "$kind"
+  setjsonvalue manifest apiVersion "$apiversion"
+  setjsonvalue manifest metadata.name  "$name"
+
+  if [ -n "$namespace" ]; then
+    setjsonvalue manifest metadata.namespace "$namespace"
+  fi
+}
+
+
+getAPIGroupFromVersion()
+{
+  local group="${2%/*}"
+  if [ "$group" = "$2" ]; then
+    group=core
+  fi
+  eval $1='"$group"'
+}
+
+getAPIGroupFromManifest()
+{
+  local vers
+  getValue vers apiVersion "$2"
+  if [ -n "$vers" ]; then
+    getAPIGroupFromVersion "$1" "$vers"
+  else
+    getValue "$1" apiGroup "$2"
+  fi
+}
+
