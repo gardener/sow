@@ -377,19 +377,21 @@ save()
 
 showEquivalences()
 {
-  local e
-  local e
-  if [ ${#equis[@]} -gt 0 ]; then
-     found "using equivalences:"
-     for l in "${equis[@]}"; do
-       local prefix="* -"
-       local list=( )
-       getJSONList list "" l
-       for e in "${list[@]}"; do
-         echo "$prefix $e"
-         prefix="  -"
-       done
-     done
+  if [ -n "$VERBOSE" ]; then
+    local e
+    local e
+    if [ ${#equis[@]} -gt 0 ]; then
+      found "using equivalences:"
+      for l in "${equis[@]}"; do
+        local prefix="* -"
+        local list=( )
+        getJSONList list "" l
+        for e in "${list[@]}"; do
+          echo "$prefix $e"
+          prefix="  -"
+        done
+      done
+    fi
   fi
 }
 
