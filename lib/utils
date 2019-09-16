@@ -287,6 +287,14 @@ join() {
   echo "$ret"
 }
 
+addHashed()
+{
+  local v
+  for v in "${@:2}"; do
+    eval "$1[\"$v\"]=X"
+  done
+}
+
 setReverse()
 { 
   local a=( )

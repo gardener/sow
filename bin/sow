@@ -1040,27 +1040,25 @@ CMD_deploy()
 _CMD_deploy()
 {
   unset todo
-  unset completed
   declare -A todo
-  declare -A completed
   for c in "$@"; do
-    todo["$c"]=X
     if isDeployed "$c"; then
       if ! isError "$c"; then
         if [ ${opts[new]+set} ]; then
           confirm "$nCOMPONENT $c already deployed"
-          completed["$c"]=X
           continue
         fi
       fi
     fi
     if [ $procs -le 1 ]; then
     __CMD_deploy "$c"
+    else
+      todo["$c"]=X
     fi
   done
 
   if [ $procs -gt 1 ]; then
-    SCHEDULE_Execute --logdir "$GEN" --jobkey component --processors $procs schedule_deploy
+    SCHEDULE_Execute --silent --ignore-unknown --logdir "$GEN" --jobkey component --processors $procs schedule_deploy
   fi
 }
 
@@ -1082,12 +1080,7 @@ schedule_deploy()
   case "$1" in
     alljobs)      eval $2='( "${!todo[@]}" )';;
     dependencies) getMetaComponentImports $2 "$3";;
-    function)
-      if [ -z "${completed["$3"]}" ]; then
-        eval $2='( __CMD_deploy "$3" )'
-      else
-        eval $2='( )'
-      fi;;
+    function)     eval $2='( __CMD_deploy "$3" )';;
   esac
 }
 
@@ -1119,10 +1112,8 @@ _CMD_delete()
 {
   declare -A todo=( )
   if [ $procs -gt 1 ]; then
-    for c in "$@"; do
-      todo["$c"]=X
-    done
-    SCHEDULE_Execute --logdir "$GEN" --jobkey component --processors $procs schedule_delete
+    addHashed todo "$@"
+    SCHEDULE_Execute --ignore-unknown --logdir "$GEN" --jobkey component --processors $procs schedule_delete
   else
     for c in "$@"; do
       __CMD_delete "$c"

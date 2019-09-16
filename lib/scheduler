@@ -20,12 +20,20 @@
 #
 # schedule a set of jobs defined by a nash schedule definition function
 #
+# options:
+#  -p --processors     number of parallel tasks
+#  -E --ignore-errors  proceed even if task a fails
+#  -U --ignore-unknown assume unknown dependencies to be done
+#  -K --jobkey <key>   label used to prompt task names
+#  -d --logdir <dir>   directory to temporaraily store logs
+#  -s --silent         omit prompting task commands
+#
 # $1: name of schedule definition function
 #
 SCHEDULE_Execute()
 {
   declare -A opts=( )
-  declare -A params=( [E]=ignore-errors [K]="=jobkey" [p]="=processors" [d]="=logdir" [s]=silent )
+  declare -A params=( [E]=ignore-errors [K]="=jobkey" [I]=ignore-unknown [p]="=processors" [d]="=logdir" [s]=silent )
   OPT_parse_options params opts "$@"
   shift $(( _cnt - 1 ))
 
@@ -48,7 +56,9 @@ SCHEDULE_Execute()
 
 
   local _jobs=( )
+  declare -A _hashed_jobs=( )
   $func_def alljobs _jobs
+  addHashed _hashed_jobs "${_jobs[@]}"
 
   declare -A donejobs=( )
   declare -A failedjobs=( )
@@ -67,7 +77,6 @@ SCHEDULE_Execute()
       wait -n
       local s=$?
       set -e
-      echo "################# got job event $s"
 
       if [ $s == 127 ]; then
         break
@@ -79,7 +88,11 @@ SCHEDULE_Execute()
       done
     done
     removeCleanupHandler __cleanupSchedule
-    found "all ${JOBKEY}s done"
+    if [ ${#donejobs[@]} -eq ${#_jobs[@]} ]; then
+      found "all ${JOBKEY}s done"
+    else
+      found "${#donejobs[@]} of ${#_jobs[@]} ${JOBKEY}s done"
+    fi
   else
     while [ ${#donejobs[@]} -lt ${#_jobs[@]} ]; do
       for j in "${_jobs[@]}"; do
@@ -88,18 +101,27 @@ SCHEDULE_Execute()
         fi
         local _deps=( )
         $func_def dependencies _deps "$j"
+        debug "checking dependencies for $j: ${_deps[@]}"
         for d in "${_deps[@]}" ; do
-          if [ -z "${donejobs["$d"]}" ]; then
-            continue 2
-          fi
-          if ! [ ${opts[ignore-errors]+set} ]; then
-            if [ -n "${failedjobs["$d"]}" ]; then
-              donejobs["$j"]=X
-              failedjobs["$j"]=x
+          if [ -n "${_hashed_jobs["$d"]}" -o -n "${opts["ignore-unknown"]-unset}" ]; then
+            if [ -z "${donejobs["$d"]}" ]; then
+              debug "  $d not yet done"
               continue 2
             fi
+            if [ ${opts[ignore-errors]-unset} ]; then
+              if [ -n "${failedjobs["$d"]}" ]; then
+                donejobs["$j"]=X
+                failedjobs["$j"]=x
+                debug "  $d failed"
+                continue 2
+              fi
+            fi
+            debug "  $d done"
+          else
+            debug "  $d ignored as unknown"
           fi
         done
+        debug "all dependencies ready"
         local _func=( )
         $func_def function _func "$j"
         if [ ${#_func[@]} -eq 0 ]; then
@@ -159,7 +181,11 @@ _start()
       if _is_color; then
         export color_mode=X
       fi
-      found starting $JOBKEY $1: $BASHPID: ${_func[@]}
+      if [ ${opts[silent]+set} ]; then
+        found "starting $JOBKEY $1: $BASHPID"
+      else
+        found "starting $JOBKEY $1: $BASHPID (${_func[@]})"
+      fi
       "${_func[@]}" >"${prefix}-OUT-$BASHPID" 2>"${prefix}-ERR-$BASHPID"
     ) &
 
@@ -191,11 +217,19 @@ _done()
   cat "${prefix}-ERR-$pid" >&2
   rm -f "${prefix}-OUT-$pid" "${prefix}-ERR-$pid"
   if [ $s -ne 0 ]; then
-    error "$JOBKEY $j: $pid (${_func[@]}) failed ($s)"
+    if [ ${opts[silent]+set} ]; then
+      error "$JOBKEY $j: $pid failed ($s)"
+    else
+      error "$JOBKEY $j: $pid (${_func[@]}) failed ($s)"
+    fi
     failedjobs["$j"]=X
     failed=$((failed + 1 ))
   else
-    found "$JOBKEY $j: $pid (${_func[@]}) succeeded"
+    if [ ${opts[silent]+set} ]; then
+      found "$JOBKEY $j: $pid succeeded"
+    else
+      found "$JOBKEY $j: $pid (${_func[@]}) succeeded"
+    fi
   fi
   _schedule
 }
@@ -210,23 +244,34 @@ _schedule()
       if [ -n "${scheduledjobs[$j]}" ]; then
         continue
       fi
+      if [ ${#activejobs[@]} -ge $MAXPROCS ]; then
+        debug "max tasks active -> skip sheduling more tasks"
+        return
+      fi
       local _deps=( )
       $func_def dependencies _deps "$j"
+      debug "checking dependencies for $j: ${_deps[@]}"
       for d in "${_deps[@]}" ; do
-        if [ -z "${donejobs[$d]}" ]; then
-          continue 2
-        fi
-        if ! [ ${opts[ignore-errors]+set} ]; then
-          if [ -n "${failedjobs[$d]}" ]; then
-            donejobs["$j"]=X
-            failedjobs["$j"]=x
-            continue 2
+        if [ -n "${_hashed_jobs["$d"]}" -o -n "${opts["ignore-unknown"]-unset}" ]; then
+          if [ -z "${donejobs[$d]}" ]; then
+              debug "  $d not yet done"
+              continue 2
           fi
+          if [ ${opts["ignore-errors"]-unset} ]; then
+            if [ -n "${failedjobs[$d]}" ]; then
+              donejobs["$j"]=X
+              failedjobs["$j"]=x
+              debug "  $d failed"
+              continue 2
+            fi
+          fi
+          debug "  $d done"
+        else
+          debug "  $d ignored as unknown"
         fi
       done
-      if [ ${#activejobs[@]} -lt $MAXPROCS ]; then
-        _start $j
-      fi
+      debug "all dependencies ready"
+      _start $j
     done
   done
 }

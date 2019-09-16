@@ -53,5 +53,5 @@ getMetaComponentMissing()
 
 getMetaComponentImports()
 {
-  getJSONList $1 "components[\"$2\"].imports" METAJSON
+  getValueList $1 "components[\"$2\"].imports[].component" METAJSON
 }
