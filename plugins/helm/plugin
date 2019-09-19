@@ -125,8 +125,11 @@ helm_template() {
     eval $(echo "$cmd") | dump "$dir/rendered_charts.yaml"
 }
 
-case "$1" in
-    deploy) deploy "$@";;
-    delete) delete "$@";;
-    *) fail "unsupported action $1"
-esac
+(
+    unset DEBUG
+    case "$1" in
+        deploy) deploy "$@";;
+        delete) delete "$@";;
+        *) fail "unsupported action $1"
+    esac
+)
