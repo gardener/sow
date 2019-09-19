@@ -334,12 +334,22 @@ The execution order is taken from the list order and reversed for the deletion
 of a component.
 
 To always use a dediacted order, for example to use a plugin to prepare the 
-input for the ext one, a dedicated order can be pinned for a dedicated sequence
+input for the next one, a dedicated order can be pinned for a dedicated sequence
 of plugins. 
 
 This is done done with a built-in plugin called `pinned`. It takes
 a list of regular plugin specifications that are always executed in the given
 order.
+
+To declare a list of plugins using the standard (unpinned) behavior, the
+built-in plugin `unpinned` can be used.
+
+If multiple plugins can be be executed in parallel, the build-in plugin
+`parallel`can be used. Like `pinned` and `unpinned` it accepts a list of
+plugins.
+
+The `pinned` and `unpinned` plugins can be used inside `parallel` to include
+a list of pligins with a defined execution order.
 
 #### Built-in Plugins
 
@@ -351,9 +361,9 @@ script of a component.
 A built-in plugin is just a shell function with the prefix `BUILTIN_`.
 It must take three arguments:
 
-$1: the action (deploy, delete, prepare or cleanup)
-$2: the plugin exection specification as json
-$3: the original document declaring the plugin execution
+- $1: the action (deploy, delete, prepare or cleanup)
+- $2: the plugin exection specification as json
+- $3: the original document declaring the plugin execution
 
 The execution spec includes a `name` field and an optional `args`, `path` or
 `config` field. The simplified spec (see examples above) always provide
@@ -366,13 +376,19 @@ it is the task of the plugin to access the config in the original document, if
 required. There is no predefined file system based contract as for regular
 plugins.
 
+There are some predefined built-in plugins:
+
+- `pinned`: execute list of plugins always in the given order (for creation and deletion)
+- `unpinned`: execute the plugins in the reversed order for deletion
+- `parallel`: execute plugins in parallel
+
 #### Action Script
 
 A component may contain an `action` script below its root folder.
 This script file is `sourced` by a bash executing an action. It
 may define builtin plugins (using the internal builtin interface) or regular
 plugins just as shell function. Any shell function defined here
-can be called as regularplugin just by its name for the descriptor files.
+can be called as regular plugin just by its name for the descriptor files.
 
 ### `export.yaml`
 
@@ -474,7 +490,7 @@ prior to any command execution.
 
 ## Plugins
 
-Plugins are used to exeute the real installation work.
+Plugins are used to execute the real installation work.
 There are several plugins delivered with the tool, but an installation
 source or even a single component might provide own or replace existing plugins.
 

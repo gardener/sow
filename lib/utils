@@ -22,7 +22,29 @@ source "$SOWLIB/stdio"
 # standard error handling
 ################################################################################
 
+catch()
+{
+  set +e
+  (
+    set -e
+    "${@:2}"
+  )
+  eval $1=$?
+  set -e
+}
+
 errorHandler=( )
+
+TMP_NAME=/tmp/sow$$-
+
+declare -Ag cleanup_handlers
+
+handle_interrupt()
+{
+  handle_error
+  cleanup_handlers=( )
+  exit 126
+}
 
 handle_error()
 {
@@ -58,6 +80,54 @@ handle_error()
     fi
     exec_cmd "$INSTALLATION_HANDLER" finalize "$INSTALLATION_HANDLER_CONFIG"
   fi
+  rm -f "${TMP_NAME}"*
+  
+  local h
+  for h in "${!cleanup_handlers[@]}"; do
+    local p="$(expr "$h" : '.*-\([0-9]*\)')"
+    if [ -n "$p" ]; then
+      if [ $p -ne $BASHPID ]; then
+        continue
+      fi
+      h="$(expr "$h" : '\(.*\)-[0-9]*')"
+    fi
+    $h
+  done
+}
+
+addCleanupHandler()
+{
+  local h
+  for h; do
+    cleanup_handlers[$h]=$((cleanup_handlers[$h] + 1 ))
+  done
+}
+addLocalCleanupHandler()
+{
+  local h
+  for h; do
+    if [ -z "${cleanup_handlers[$h]}" ]; then
+      h="$h-$BASHPID"
+    fi
+    cleanup_handlers[$h]=$((cleanup_handlers[$h] + 1 ))
+  done
+}
+_removeCleanupHandler()
+{
+  local h
+  for h; do
+    cleanup_handlers[$h]=$((cleanup_handlers[$h] - 1 ))
+    if [ ${cleanup_handlers[$h]} -le 0 ]; then
+      unset cleanup_handlers[$h]
+    fi
+  done
+}
+removeCleanupHandler()
+{
+  local h
+  for h; do
+    _removeCleanupHandler "$h" "$h-$BASHPID"
+  done
 }
 
 StandardErrorHandling()
@@ -71,22 +141,34 @@ StandardErrorHandling()
   set -e
   export INTENDED_EXIT=
   trap handle_error ERR EXIT
+  trap handle_interrupt INT
 }
 
 ExecuteInSubshell()
 {
   (
     StandardErrorHandling
-    trap handle_error ERR EXIT
     "$@"
   )
 }
 
 StandardErrorHandling
 
+if [ -n "$TRACE" ]; then
+  set -x
+fi
+
 ################################################################################
 # standard utils
 ################################################################################
+
+header_message()
+{
+  if [ -n "${!1}" ]; then
+    info "${!1}"
+    eval $1=
+  fi
+}
 
 add_functions()
 {
@@ -203,6 +285,14 @@ join() {
   shift 2 || shift $(($#))
   ret+="${*/#/$sep}"
   echo "$ret"
+}
+
+addHashed()
+{
+  local v
+  for v in "${@:2}"; do
+    eval "$1[\"$v\"]=X"
+  done
 }
 
 setReverse()
@@ -637,91 +727,6 @@ lookupStub() {
   productDirs dirs
   lookupFileIn "$1" "${dirs[@]}" "$CURRENT"  "$ROOT" "$SOW"
 }
-
-################################################################################
-# manifest
-################################################################################
-
-# output:
-# name
-# namespace
-# kind
-# apiversion
-# objectkey
-# objectentry
-
-getManifestInfo()
-{
-  local manifest="$1"
-  local msg=""
-  if [ -n "$2" ]; then
-    msg="$2: "
-  fi
-
-  namespace=
-  getValue kind kind manifest
-  getValue apiversion apiVersion manifest
-  getValue name metadata.name manifest
-  getValue namespace metadata.namespace manifest
-
-  if [ -z "$name" ]; then
-    fail "$msg: name required for manifest"
-  fi
-  if [ -z "$kind" ]; then
-    fail "$msg: kind required for manifest"
-  fi
-  if [ -z "$apiversion" ]; then
-    fail "$msg: apiVersion required for manifest"
-  fi
-
-  objectkey="$(md5sum <<<"$name/$namespace/$kind/$apiversion" | cut -d' '  -f1)"
-  objectentry="{}"
-  setjsonvalue objectentry name "$name"
-  if [ -n "$namespace" ]; then
-    setjsonvalue objectentry namespace "$namespace"
-  fi
-  setjsonvalue objectentry kind "$kind"
-  setjsonvalue objectentry apiVersion "$apiversion"
-  if [ -n "$ord" ]; then
-    setjsonvalue objectentry index "$ord"
-  else
-    deljsonkey objectentry index
-  fi
-}
-
-getManifestInfoFromEntry()
-{
-  local v="${1:-objectentry}"
-  namespace=
-  kind=
-  name=
-  apiversion=
-  ord=
-  getValue kind kind $v
-  getValue apiversion apiVersion $v
-  getValue name name $v
-  getValue namespace namespace $v
-  getValue ord index $v
-
-  manifest="{}"
-
-  setjsonvalue manifest kind "$kind"
-  setjsonvalue manifest apiVersion "$apiversion"
-  setjsonvalue manifest metadata.name  "$name"
-
-  if [ -n "$namespace" ]; then
-    setjsonvalue manifest metadata.namespace "$namespace"
-  fi
-}
-
-getAPIServer()
-{
-  kubectl --kubeconfig "$1" config view --minify=true -o jsonpath='{.clusters[*].cluster.server}'
-}
-
-if [ -n "$TRACE" ]; then
-  set -x
-fi
 
 ################################################################################
 # standard plugin utilities

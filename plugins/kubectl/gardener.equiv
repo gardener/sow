@@ -1,0 +1,29 @@
+equivalences:
+  - - kind: CloudProfile
+      apiGroup: garden.sapcloud.io
+    - kind: CloudProfile
+      apiGroup: core.gardener.cloud
+  - - kind: Seed
+      apiGroup: garden.sapcloud.io
+    - kind: Seed
+      apiGroup: core.gardener.cloud
+  - - kind: Project
+      apiGroup: garden.sapcloud.io
+    - kind: Project
+      apiGroup: core.gardener.cloud
+  - - kind: SecretBinding
+      apiGroup: garden.sapcloud.io
+    - kind: SecretBinding
+      apiGroup: core.gardener.cloud
+  - - kind: Quota
+      apiGroup: garden.sapcloud.io
+    - kind: Quota
+      apiGroup: core.gardener.cloud
+  - - kind: Shoot
+      apiGroup: garden.sapcloud.io
+    - kind: Shoot
+      apiGroup: core.gardener.cloud
+  - - kind: Plant
+      apiGroup: garden.sapcloud.io
+    - kind: Plant
+      apiGroup: core.gardener.cloud

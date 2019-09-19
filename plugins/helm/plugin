@@ -1,4 +1,4 @@
-#!/bin/bash -e
+#!/usr/bin/env bash
 #
 # Copyright 2019 Copyright (c) 2019 SAP SE or an SAP affiliate company. All rights reserved. This file is licensed under the Apache Software License, v. 2 except as noted otherwise in the LICENSE file.
 #
@@ -125,8 +125,11 @@ helm_template() {
     eval $(echo "$cmd") | dump "$dir/rendered_charts.yaml"
 }
 
-case "$1" in
-    deploy) deploy "$@";;
-    delete) delete "$@";;
-    *) fail "unsupported action $1"
-esac
+(
+    unset DEBUG
+    case "$1" in
+        deploy) deploy "$@";;
+        delete) delete "$@";;
+        *) fail "unsupported action $1"
+    esac
+)
