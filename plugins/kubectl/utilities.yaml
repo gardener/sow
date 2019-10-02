@@ -51,7 +51,7 @@ utilities:
     
       kubeconfig:
         <<: (( &template ))
-        apiVersion: v1
+        apiVersion: v1  
         kind: Config
         current-context: (( values.username ))
         contexts:
@@ -75,4 +75,6 @@ utilities:
     generate: (( lambda |file,config,settings|->*_.templates.kubectl ))
 
     getField: (( |k,t,o,p|->exec(*_.templates.kubectl_getfield) ))
+    getFieldUncached: (( |k,t,o,p|->exec_uncached(*_.templates.kubectl_getfield) ))
     get: (( |k,t,o|->exec(*_.templates.kubectl_get) ))
+    getUncached: (( |k,t,o|->exec_uncached(*_.templates.kubectl_get) ))

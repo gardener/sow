@@ -24,3 +24,5 @@ utilities:
 
   secretdata: (( |data|->sum[data|{}|s,k,v|->s {k=base64(v)}] ))
 
+  substitute: (( |src,mappings|-> sum[mappings|src|s,k,v|-> replace(s, "___" k "___", v)] ))
+  substituteList: (( |sources,mappings|-> map[sources|src|-> subst(src,mappings)] ))
