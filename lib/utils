@@ -295,6 +295,57 @@ addHashed()
   done
 }
 
+prependOrderedSet()
+{
+  local a=( )
+  eval a="( \"\${$1[@]}\" )"
+  local o
+  for o in "${@:2}"; do
+    if ! contains "$o" "${a[@]}"; then
+      a=( "$o" "${a[@]}" )   
+    fi
+  done
+  eval "$1"="( \"\${a[@]}\" )"
+}
+
+appendOrderedSet()
+{
+  local a=( )
+  eval a="( \"\${$1[@]}\" )"
+  local o
+  for o in "${@:2}"; do
+    if ! contains "$o" "${a[@]}"; then
+      a=( "${a[@]}" "$o" )   
+    fi
+  done
+  eval "$1"="( \"\${a[@]}\" )"
+}
+
+appendList()
+{
+  local a=( )
+  eval a="( \"\${$1[@]}\" )"
+  local o
+  for o in "${@:2}"; do
+    a=( "${a[@]}" "$o" )   
+  done
+  eval "$1"="( \"\${a[@]}\" )"
+}
+
+removeList()
+{
+  local a=( )
+  eval a="( \"\${$1[@]}\" )"
+  local n=( )
+  local o
+  for o in "${a[@]}"; do
+    if ! contains "$o" "${@:2}"; then
+      n=( "${n[@]}" "$o" )   
+    fi
+  done
+  eval "$1"="( \"\${n[@]}\" )"
+}
+
 setReverse()
 { 
   local a=( )
@@ -661,7 +712,7 @@ setjsonvalue() {
 
 setjsonjson() {
     local v
-    v="$(eval echo \"\${"$1"}\" | jq -s '.[0].'""$2""'=.[1] | .[0]' - <( echo "$3"))"
+    v="$(eval echo \"\${"$1"}\" | jq -s '.[0].'"$2"'=.[1] | .[0]' - <( echo "$3"))"
     eval $1=\'"$v"\'
 }
 
