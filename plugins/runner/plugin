@@ -1,0 +1,185 @@
+#!/usr/bin/env bash
+#
+# Copyright 2019 Copyright (c) 2019 SAP SE or an SAP affiliate company. All rights reserved. This file is licensed under the Apache Software License, v. 2 except as noted otherwise in the LICENSE file.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+#
+# run a command in background
+# the command will be stopped and restarted if the command or its
+# arguments are changed
+#
+# if the command stops on its own, it is not automatically be restarted.
+# to restart it, the component must be redeployed.
+#
+# The following configuration parameter are supported:
+#
+# command:     the command to be executed given by name or path
+# environment: a map of environment variables to set for the command execution
+# arguments:   a list of arguments to call the command with
+# properties:  a map of substitutions applied to the given arguments prior to 
+#              calling the command
+#
+
+set -e
+
+source "$SOWLIB/pluginutils"
+
+STATEFILE="$STATEDIR/state.json"
+state=""
+if [ -f "$STATEFILE" ]; then
+  state="$(cat "$STATEFILE")"
+fi
+
+declare -A env
+declare -A props
+args=( )
+cmd=
+getRequiredValue cmd command PLUGINCONFIGJSON
+getValueMap env environment PLUGINCONFIGJSON
+getValueMap props properties PLUGINCONFIGJSON
+getValueList args arguments PLUGINCONFIGJSON
+
+if [ ${#props[@]} -gt 0 ]; then
+  cnt=0
+  for a in "${args[@]}"; do
+    for k in "${!props[@]}"; do
+      args[$cnt]="$(echo -n "$a" | sed -e s/"$k"/"${props[$k]}"/g)"
+    done
+    (( cnt += 1 ))
+  done
+fi
+
+
+
+hashCommand()
+{
+  if [ ! -f "$cmd" ]; then
+    file="$(which "$cmd")"
+    if [ -z "$file" ]; then
+      fail "command $cmd not found"
+    else
+      cmd="$file"
+    fi
+  fi
+  if [ ! -f "$cmd" ]; then
+    fail "command $cmd not executable"
+  fi
+
+  read a b <<<"$(md5sum -b "$cmd")"
+
+  local __data
+  local __field
+  jsonAddString __data "command" "$a"
+
+  keys=( $( echo ${!env[@]} | tr ' ' $'\n' | sort ) )
+  for k in "${keys[@]}"; do
+    jsonAddString __field "$k" "${env[$k]}"
+  done
+  jsonAdd __data "environment" "{ $__field }"
+
+  __field=
+  for a in "${args[@]}"; do
+    jsonAddString __field "$a"
+  done
+  jsonAdd __data "arguments" "{ $__field }"
+
+  read a b <<<"$(echo "$__data" | md5sum)"
+  verbose "execution hash: $a"
+  eval $1='"'"$a"'"'
+}
+
+stopRunner()
+{
+  local hash
+  local pid
+  if [ -n "$state" ]; then
+    verbose "found state $state"
+    getValue hash hash state
+    verbose "old state=$hash (required $1)"
+    if [ -z "$1" -o "$hash" != "$1" ]; then
+       if [ -n "$1" ]; then
+         verbose "hash mismatch -> old needs to be stopped"
+       fi
+       getValue pid pid state
+       verbose "old pid=$pid"
+       if [ -n "$pid" ] && kill -0 $pid; then
+         info "stopping runner $pid"
+         kill -9 $pid
+         echo >"$STATEFILE"
+         state=
+       fi
+    fi
+  fi
+}
+
+startRunner()
+{
+  local hash
+  if [ -n "$state" ]; then
+    getValue hash hash state
+    if [ "$hash" == "$1" ]; then
+       getValue pid pid state
+       if [ -n "$pid" ] && kill -0 $pid; then
+         info "still running with pid $pid"
+         return
+       fi
+    fi
+  fi
+
+  echo "starting runner $cmd ($1)"
+  (
+    for k in "${!env[@]}"; do
+      export $k="${env[$k]}"
+    done
+    "$cmd" "${args[@]}" >"$GENDIR/log" 2>&1
+    echo >"$STATEFILE"
+  )&
+  pid=$!
+  local __data
+  jsonAddString __data pid "$pid"
+  jsonAddString __data hash "$1"
+  echo "{ $__data }" > "$STATEFILE"
+}
+
+deploy()
+{
+  local hash
+  local msg
+  msg=environment:
+  for k in "${!env[@]}"; do
+    header_message msg verbose
+    verbose "$k=${env[$k]}"
+  done
+
+  msg=arguments:
+  for a in "${args[@]}"; do
+    header_message msg verbose
+    verbose "- $a"
+  done
+
+  hashCommand hash
+  stopRunner "$hash"
+  startRunner "$hash"
+}
+
+delete() {
+  stopRunner
+}
+
+case "$1" in
+    deploy) deploy "$@";;
+    delete) delete "$@";;
+    *) fail "unsupported action $1"
+esac

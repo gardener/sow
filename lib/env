@@ -104,7 +104,7 @@ determineRoot()
 
 getTemplateJSON()
 {
-  TEMPLATEJSON="$(spiff merge --json "$1" "$SOWLIB/templates/component.yaml" "$CONFIG")"
+  TEMPLATEJSON="$(spiff merge --json "$1" "$CONFIG")"
   if [ -z "$TEMPLATEJSON" ]; then
     TEMPLATEJSON="{}"
   fi
@@ -112,7 +112,7 @@ getTemplateJSON()
 
 getComponentJSON()
 {
-  COMPONENTJSON="$(spiff merge --json "$1" "$SOWLIB/templates/component.yaml" "$CONFIG")"
+  COMPONENTJSON="$(spiff merge --json "$1" "$SOWLIB/templates/component.yaml" "$CONFIG" - <<<'{ "env": { "component": "'"$2"'", "product": "'"$3"'" }}' )"
   if [ -z "$COMPONENTJSON" ]; then
     COMPONENTJSON="{}"
   fi

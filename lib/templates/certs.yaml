@@ -91,7 +91,7 @@ utilities:
         <<: (( &template ))
         state:
           key: (( x509genkey(input) ))
-          pub: (( x509publickey(key) ))
+          pub: (( x509publickey(key,"ssh") ))
 
       #
       # the state specification required by

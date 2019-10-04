@@ -14,11 +14,14 @@
 
 
 
-landscape: (( &template ))
+landscape: (( &temporary ))
+env: (( &temporary ))
+
 
 utilities:
   <<: (( &inject &temporary(merge || ~) ))
 
   components:
+    Optional: (( components.isEnabled(.env.component) ))
     isEnabled: (( |c|-> contains(_.landscape.activate || [],c) ))
 

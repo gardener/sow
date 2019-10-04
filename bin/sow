@@ -127,33 +127,6 @@ case "$1" in
            exit 0;;
 esac
 
-
-jsonAdd()
-{
-  local new
-  if [ $# -eq 3 ]; then
-    new="\"$2\": $3"
-  else
-    new="$2"
-  fi
-
-  if [ -n "${!1}" ]; then
-    new="${!1}, $new"
-  else
-    new="$new"
-  fi
-  eval $1="\"\$new\""
-}
-
-jsonAddString()
-{
-  if [ $# -eq 3 ]; then
-    jsonAdd "$1" "$2" "\"$3\""
-  else
-    jsonAdd "$1" "\"$2\""
-  fi
-}
-
 componentStub()
 {
   local __stub
@@ -243,7 +216,9 @@ setupComponentMeta()
 
   setComponent "${1%/*}"
   debug "  $component: $reldir ($product)"
-  getComponentJSON "$line"
+  COMPONENTS["$component"]="$reldir"
+
+  getComponentJSON "$line" "$component" "$product"
   declare -A import_map
   getImports import_map COMPONENTJSON
   getValue templ component.template COMPONENTJSON
@@ -252,7 +227,6 @@ setupComponentMeta()
     active=true
   fi
 
-  COMPONENTS["$component"]="$reldir"
 
   jsonAdd jattr active "$active"
   jsonAddString jattr dir "$reldir"
@@ -703,7 +677,7 @@ showComponent()
     ( # should be part of the landscape meta data, later on
       CURRENT="$ROOT/${COMPONENTS["$c"]}"
       setComponent "$CURRENT"
-      getComponentJSON "$CURRENT/$fCOMPDEF"
+      getComponentJSON "$CURRENT/$fCOMPDEF" "$c" "$prod"
       PRODUCTDIR="$productdir"
 
       declare -a slist=( )

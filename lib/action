@@ -18,7 +18,7 @@ ACTION_setup()
 {
   CURRENT="${COMPONENTS["$1"]}"
   if [ -z "$CURRENT" ]; then
-    fail "unknonn $nCOMPONENT $1"
+    fail "unknown $nCOMPONENT $1"
   fi
   COMPONENT="$1"
 
@@ -111,7 +111,7 @@ action_deployment()
   if contains component "${steps[@]}";then 
     if [ -f "$CURRENT/$fCOMPDEF" ]; then
       verbose "generating effective component manifest"
-      getComponentJSON "$CURRENT/$fCOMPDEF"
+      getComponentJSON "$CURRENT/$fCOMPDEF" "$COMPONENT" "$PRODUCT"
     else
       COMPONENTJSON="{}"
     fi

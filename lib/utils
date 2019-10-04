@@ -165,7 +165,7 @@ fi
 header_message()
 {
   if [ -n "${!1}" ]; then
-    info "${!1}"
+    ${2:-info} "${!1}"
     eval $1=
   fi
 }
@@ -409,7 +409,6 @@ _jq_get_labeled_value_list()
   jq -r '('$1' // empty) | if type == "object" then . as $m | keys[] | [.,$m[.]] elif type == "array" then .[] | if type == "object" then . as $m | keys[] | [.,$m[.]] else [.,.] end else . end | join("  ")'
 }
 
-
 #
 # extract a sequence of labeled arg lists from json
 # result: sequence of "<arg1>" .. "<argn>" tupels
@@ -635,6 +634,14 @@ getPluginList() {
   eval $1="( $v )"
 }
 
+getValueMap() {
+  local keys=( )
+  getKeys keys "${@:2}"
+  for k in "${keys[@]}"; do
+    getValue "$1[$k]" $2['"'$k'"'] $3
+  done
+}
+
 ################################################################################
 # json manipulation
 ################################################################################
@@ -669,6 +676,36 @@ getrequiredjsonvalue() {
         fail "field $2 required in $1"
     fi
     echo "$v"
+}
+
+################################################################################
+# json composition
+################################################################################
+
+jsonAdd()
+{
+  local new
+  if [ $# -eq 3 ]; then
+    new="\"$2\": $3"
+  else
+    new="$2"
+  fi
+
+  if [ -n "${!1}" ]; then
+    new="${!1}, $new"
+  else
+    new="$new"
+  fi
+  eval $1="\"\$new\""
+}
+
+jsonAddString()
+{
+  if [ $# -eq 3 ]; then
+    jsonAdd "$1" "$2" "\"$3\""
+  else
+    jsonAdd "$1" "\"$2\""
+  fi
 }
 
 ################################################################################
