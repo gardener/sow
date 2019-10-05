@@ -115,7 +115,7 @@ stopRunner()
        getValue pid pid state
        verbose "old pid=$pid"
        if [ -n "$pid" ] && kill -0 $pid; then
-         info "stopping runner $pid"
+         info "stopping runner instance $PLUGININSTANCE ($pid)"
          kill -9 $pid
          echo >"$STATEFILE"
          state=
@@ -132,13 +132,13 @@ startRunner()
     if [ "$hash" == "$1" ]; then
        getValue pid pid state
        if [ -n "$pid" ] && kill -0 $pid; then
-         info "still running with pid $pid"
+         info "instance $PLUGININSTANCE still running with pid $pid"
          return
        fi
     fi
   fi
 
-  echo "starting runner $cmd ($1)"
+  info "starting runner $cmd ($1)"
   (
     for k in "${!env[@]}"; do
       export $k="${env[$k]}"
@@ -147,6 +147,7 @@ startRunner()
     echo >"$STATEFILE"
   )&
   pid=$!
+  info "pid for instance $PLUGININSTANCE is $pid"
   local __data
   jsonAddString __data pid "$pid"
   jsonAddString __data hash "$1"
