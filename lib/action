@@ -380,7 +380,7 @@ cleanup_parallel()
   if [ ${#BACKGROUND} -gt 0 ]; then
     info "aborting background processes..."
     for pid in "${BACKGROUND[@]}"; do
-      kill $pid 2>/dev/null || true
+      killpg $pid 2>/dev/null || true
     done
   fi
 
@@ -540,11 +540,15 @@ handle_exports()
         fi
       fi
       _jq_get_value '(.files // empty) | keys[]' <<<"$EXPORTJSON" | while IFS= read -r line; do
+        local p
+        local data
+        local mode
         getValue  p "files[\"$line\"].path" EXPORTJSON
         if [ -z "$p" ]; then
           p="$line"
         fi
         getValue data "files[\"$line\"].data" EXPORTJSON
+        getValue mode "files[\"$line\"].mode" EXPORTJSON
 
         echo "exporting file $p"
         local file="$EXPORTDIR/$p"
@@ -553,6 +557,9 @@ handle_exports()
           mkdir -p "$dirname"
         fi
         echo "$data" > "$file"
+        if [ -n "$mode" ]; then
+          chmod $mode $file
+        fi
       done
     else
       echo "---" > "$EXPORTDIR/export.yaml"

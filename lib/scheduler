@@ -151,7 +151,7 @@ __cleanupSchedule()
   for pid in "${!activejobs[@]}"; do
     header_message msg
     found "  ${activejobs[$pid]} ($pid)"
-    kill $pid >/dev/null 2>&1 || true
+    killpg $pid >/dev/null 2>&1 || true
   done
 
   if [ -n "$SCHEDULE_LOG_PREFIX" ]; then

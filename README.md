@@ -401,7 +401,8 @@ its processing as stub. It also contains the actual state, therefore the
 state file is omitted.
 
 If it contains a `files` section the listes files (structure with `path` and
-`data` fields) are written to the components export folder.
+`data` fields) are written to the components export folder. Optionally the
+file mode is specified with `mode`.
 
 ### The Generation Process
 

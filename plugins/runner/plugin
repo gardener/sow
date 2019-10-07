@@ -36,6 +36,11 @@ set -e
 
 source "$SOWLIB/pluginutils"
 
+subst()
+{
+  echo "${1/$2/$3}"
+}
+
 STATEFILE="$STATEDIR/state.json"
 state=""
 if [ -f "$STATEFILE" ]; then
@@ -52,14 +57,19 @@ getValueMap props properties PLUGINCONFIGJSON
 getValueList args arguments PLUGINCONFIGJSON
 
 if [ ${#props[@]} -gt 0 ]; then
-  cnt=0
-  for a in "${args[@]}"; do
+  for a in "${!args[@]}"; do
     for k in "${!props[@]}"; do
-      args[$cnt]="$(echo -n "$a" | sed -e s/"$k"/"${props[$k]}"/g)"
+      args[$a]="$(subst "${args[$a]}" "$k" "${props[$k]}")"
     done
-    (( cnt += 1 ))
+  done
+
+  for a in "${!env[@]}"; do
+    for k in "${!props[@]}"; do
+      env[$a]="$(subst "${env[$a]}" "$k" "${props[$k]}")"
+    done
   done
 fi
+
 
 
 
@@ -116,7 +126,7 @@ stopRunner()
        verbose "old pid=$pid"
        if [ -n "$pid" ] && kill -0 $pid; then
          info "stopping runner instance $PLUGININSTANCE ($pid)"
-         kill -9 $pid
+         killpg -9 $pid
          echo >"$STATEFILE"
          state=
        fi
@@ -131,7 +141,7 @@ startRunner()
     getValue hash hash state
     if [ "$hash" == "$1" ]; then
        getValue pid pid state
-       if [ -n "$pid" ] && kill -0 $pid; then
+       if [ -n "$pid" ] && kill -0 $pid 2>/dev/null; then
          info "instance $PLUGININSTANCE still running with pid $pid"
          return
        fi
@@ -143,7 +153,7 @@ startRunner()
     for k in "${!env[@]}"; do
       export $k="${env[$k]}"
     done
-    "$cmd" "${args[@]}" >"$GENDIR/log" 2>&1
+    "$cmd" "${args[@]}" >"$dir/log" 2>&1
     echo >"$STATEFILE"
   )&
   pid=$!

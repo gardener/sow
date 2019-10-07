@@ -587,7 +587,7 @@ getRequiredConfigJSONList() {
 
 
 getKeys() {
-  _get_value_list "$1" "$2 | keys" "$3"
+  _get_value_list "$1" "| ((.$2) // {}) | keys" "$3"
 }
 
 getValue() {
@@ -791,4 +791,17 @@ PLUGIN_setup()
   mkdir -p "$dir" "$state"
 
   verbose "using path $PLUGININSTANCE"
+}
+
+killpg()
+{
+  local s
+  case "$1" in
+  -*) s="$1"; shift;;
+  esac
+
+  local g="$(ps -o pgid= $1)"
+  if [ -n "$g" ]; then
+    kill $s -- -$g
+  fi
 }
