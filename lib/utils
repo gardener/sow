@@ -801,7 +801,7 @@ killpg()
   esac
 
   local g="$(ps -o pgid= $1)"
-  if [ -n "$g" ]; then
-    kill $s -- -$g
+  if [ -n "${g## }" ]; then
+    kill $s -- -${g## }
   fi
 }

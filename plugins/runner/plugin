@@ -30,6 +30,8 @@
 # arguments:   a list of arguments to call the command with
 # properties:  a map of substitutions applied to the given arguments prior to 
 #              calling the command
+# startupTime  time in seconds to wait to figure out whether command started
+#              or failed
 #
 
 set -e
@@ -52,10 +54,14 @@ declare -A props
 args=( )
 cmd=
 getRequiredValue cmd command PLUGINCONFIGJSON
+getValue startup startupTime PLUGINCONFIGJSON
 getValueMap env environment PLUGINCONFIGJSON
 getValueMap props properties PLUGINCONFIGJSON
 getValueList args arguments PLUGINCONFIGJSON
 
+if [ -z "${startup## }" ]; then
+  startup=2
+fi
 if [ ${#props[@]} -gt 0 ]; then
   for a in "${!args[@]}"; do
     for k in "${!props[@]}"; do
@@ -76,7 +82,7 @@ fi
 hashCommand()
 {
   if [ ! -f "$cmd" ]; then
-    file="$(which "$cmd")"
+    file="$(which "$cmd" || true)"
     if [ -z "$file" ]; then
       fail "command $cmd not found"
     else
@@ -153,10 +159,17 @@ startRunner()
     for k in "${!env[@]}"; do
       export $k="${env[$k]}"
     done
-    "$cmd" "${args[@]}" >"$dir/log" 2>&1
+    "$cmd" "${args[@]}" >"$dir/log" 2>&1 || {
+       echo "$cmd: execution failed"
+    }
     echo >"$STATEFILE"
   )&
   pid=$!
+  sleep $startup
+  if ! kill -0 $pid 2>/dev/null; then
+    cat "$dir/log"
+    fail "command execution failed"
+  fi
   info "pid for instance $PLUGININSTANCE is $pid"
   local __data
   jsonAddString __data pid "$pid"
