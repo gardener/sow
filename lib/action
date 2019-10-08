@@ -431,6 +431,7 @@ exec_plugin()
   local action="$1"
   local spec="$2"
   local name
+  local key
   local cpath
   local config
   local args=( )
@@ -445,12 +446,16 @@ exec_plugin()
     return
   fi
 
+  getValue key path spec
   getValue cpath path spec
   getJSON config config spec
   getValueList args args spec
   
   if [ -z "$cpath" ]; then
     cpath="$name"
+  fi
+  if [ -z "$key" ]; then
+    key="$cpath"
   fi
 
   if [ -n "${!3}" ]; then
@@ -471,11 +476,7 @@ exec_plugin()
   fi
    
   local plugin_opts=( )
-  if [ -n "$cpath" ]; then
-     PLUGININSTANCE="$cpath"
-  else
-     PLUGININSTANCE="$name"
-  fi
+  PLUGININSTANCE="$key"
   export PLUGININSTANCE
 
   local hide=
@@ -495,12 +496,12 @@ exec_plugin()
           setjsonvalue spec path "$cpath"
           setjsonjson spec config "$config"
           if [ "$action" == deploy ]; then
-            synchronized "$SOW/bin/helper/pluginlist" $action "$cpath" "$spec"
+            synchronized "$SOW/bin/helper/pluginlist" $action "$key" "$spec"
           fi
 
           __exec_plugin "${name}" "$plugin" "${plugin_opts[@]}" "$action" "${args[@]}"
           if [ "$action" == delete ]; then
-            synchronized "$SOW/bin/helper/pluginlist" $action "$cpath" "$spec"
+            synchronized "$SOW/bin/helper/pluginlist" $action "$key" "$spec"
           fi
        else
          fail "no action function or plugin with name '${name}' found"
@@ -522,12 +523,14 @@ _exec_plugin()
   local action="$1"
   local spec="$2"
   local name
+  local key
   local cpath
   local config
   local args=( )
 
   debug "executing plugin spec: $spec"
   getValue name name spec
+  getValue key key spec
   getValue cpath path spec
   getJSON config config spec
   getValueList args args spec
@@ -535,13 +538,16 @@ _exec_plugin()
   if [ -z "$cpath" ]; then
     cpath="$name"
   fi
+  if [ -z "$key" ]; then
+    key="$cpath"
+  fi
 
   export DEPLOYMEMT=
 
   export PLUGINCONFIG="$GENDIR/pluginconfig-$$.json"
   echo "${config}" >"$PLUGINCONFIG"
    
-  PLUGININSTANCE="$cpath"
+  PLUGININSTANCE="$key"
   export PLUGININSTANCE
 
   local hide=
