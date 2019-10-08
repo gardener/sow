@@ -50,10 +50,12 @@ help()
   found "    -l            show extended $nCOMPONENT info"
   info "  order [-daA] {<components>}    show $nCOMPONENT order"
   found "    -d            deletion order"
+  found "    -u            update order for dependent $nCOMPONENTS"
   info "  show [-l]{<components>}        show info about $nCOMPONENTS"
   found "    -l            show extended $nCOMPONENT info"
-  info "  deploy [-aAnm] {<components>}  deploy $nCOMPONENTS"
+  info "  deploy [-aAmn] {<components>}  deploy $nCOMPONENTS"
   found "    --parallel <n> deploy components with a maximum of n in parallel"
+  found "    -u            update dependent $nCOMPONENTS"
   info "  delete [-aAm] {<components>}   delete deployment of $nCOMPONENTS"
   found "    --force        additional actions from handlers on delete (e.g. deleting state like PVC)"
   found "    --parallel <n> delete components with a maximum of n in parallel"
@@ -644,6 +646,7 @@ showComponent()
       error "     $nTEMPLATE: $templ (not found)"
     fi
     depls=( )
+    CURRENT="$ROOT/${COMPONENTS["$c"]}"
     getComponentStandardStubs depls $fACTIONDEF "$templ"
     info "     deployment manifests:"
     for d in "${depls[@]}"; do
@@ -876,7 +879,7 @@ CMD_order()
   local data="$(declare -p opts)"
   declare -A params
   eval "declare -A opts="${data#*=}
-  params=( [d]=delete [m]=matching [a]=all [A]=All )
+  params=( [d]=delete [m]=matching [a]=all [u]=update [A]=All )
   OPT_parse_options params opts "$@"
   shift $(( _cnt - 1 ))
 
@@ -884,13 +887,13 @@ CMD_order()
   if [ ${opts[delete]+set} ]; then
     opt=-r
   fi
+  if [ ${opts[update]+set} ]; then
+    opt=-r
+    opts[all]=x
+  fi
 
   execClosure $opt _CMD_order "$@"
 }
-
-  if isDeployed "$c"; then
-    info "     not deployed"
-  fi
 
 _CMD_order()
 {
@@ -1004,11 +1007,16 @@ CMD_deploy()
   local data="$(declare -p opts)"
   declare -A params
   eval "declare -A opts="${data#*=}
-  params=( [m]=matching [a]=all [A]=All [n]=new [parallel]="=" )
+  params=( [m]=matching [a]=all [u]=update [A]=All [n]=new [parallel]="=" )
   OPT_parse_options params opts "$@"
   shift $(( _cnt - 1 ))
 
-  execClosure _CMD_deploy "$@"
+  opt=
+  if [ "${opts[update]+set}" ]; then
+    opt="-r"
+    opts[all]=x
+  fi
+  execClosure $opt _CMD_deploy "$@"
 }
 
 _CMD_deploy()
