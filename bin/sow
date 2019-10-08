@@ -179,9 +179,9 @@ setupProductMeta()
     fi
   done
 
-  if [ -f "$1/lib/sow.sh" ]; then
+  if [ -f "$1/lib/$nTOOL.sh" ]; then
     debug "sourcing exensions of product $product($reldir)"
-    source "$1/lib/sow.sh"
+    source "$1/lib/$nTOOL.sh"
   fi
 }
 
@@ -1240,9 +1240,9 @@ _resolveElements()
      if [ ${#_found[@]} -eq 0 ]; then
        if [ "$s" = . ]; then
          if [ "${opts[match]+set}" ]; then
-           fail "no $2 found"
-         else
            fail "not in a $2 or $nPRODUCT folder"
+         else
+           fail "no $2 found"
          fi
        else
          fail "unknown $2 $s"

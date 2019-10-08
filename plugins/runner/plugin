@@ -165,12 +165,19 @@ startRunner()
     echo >"$STATEFILE"
   )&
   pid=$!
-  sleep $startup
-  if ! kill -0 $pid 2>/dev/null; then
-    cat "$dir/log"
-    fail "command execution failed"
-  fi
+  # check for startup seconds for failing command execution
+  verbose "startup time to check successful execution is $startup seconds"
+  while (( startup >= 0 )); do
+    if ! kill -0 $pid 2>/dev/null; then
+      cat "$dir/log"
+      fail "command execution failed"
+    fi
+    if (( startup-- > 0 )); then
+      sleep 1
+    fi
+  done
   info "pid for instance $PLUGININSTANCE is $pid"
+  hint "command log can be found at '$dir/log'"
   local __data
   jsonAddString __data pid "$pid"
   jsonAddString __data hash "$1"

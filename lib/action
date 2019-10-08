@@ -14,6 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+setupPluginsFile()
+{
+  PLUGINSFILE="$STATE/$1/plugins.json"
+}
+
 ACTION_setup()
 {
   CURRENT="${COMPONENTS["$1"]}"
@@ -36,6 +41,7 @@ ACTION_setup()
   export GENDIR="$GEN/$COMPONENT"
   export STATEDIR="$STATE/$COMPONENT"
   export EXPORTDIR="$EXPORT/$COMPONENT"
+  setupPluginsFile "$1"
 }
 
 # $1; component
@@ -594,9 +600,8 @@ exec_configured_plugins() {
   #
   # cleanup deleted external plugin plugins
   if [ "$action" == deploy -o "$action" == delete ]; then
-    LISTFILE="$STATEDIR/plugins.json"
-    if [ -f "$LISTFILE" ]; then
-      LIST="$(cat "$LISTFILE")"
+    if [ -f "$PLUGINSFILE" ]; then
+      LIST="$(cat "$PLUGINSFILE")"
       local curlist=( )
       local lastlist=( )
       getValueList curlist current LIST

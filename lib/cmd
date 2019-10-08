@@ -16,6 +16,25 @@
 # commands
 ############################################################################
 
+#
+# The commands module offers a possibility to identify and execute
+# sub commands for a shell script.
+#
+# A sub command is a shell function starting with the prefix CMD_
+#
+# A command may offer help by providing a function HELP_<name>.
+# This function may echo lines with the following syntax
+# 
+# "<synopsis>:<short description>"
+# ":<short description followup>"
+# " <options>:<description>"
+# " :<option description followup>"
+# ""                                      # end of short command summary
+# "<any text>                             # long description
+#
+# The long description is only shown for a dedicated command help
+#
+
 ################
 # Resolve a shortcut for a given set of values
 # The resolution is found as follows  (in given order)
@@ -87,13 +106,18 @@ CMDS_execute_command()
   fi
 }
 
-
+#
+# list all command helps found in the actual shell script
+# not listed in CMDS[@}
+#
+# $1: command prefix (default CMD_)
+#
 CMDS_list_commands()
 {
   QUIET=X
   declare -F | while read a b c d; do
     echo "$c"
-  done | grep -e "^CMD_" | sed -e 's/^CMD_\(.*\)/\1/' | sort | while read a; do
+  done | grep -e "^${1:-CMD_}" | sed -e 's/^'${1:-CMD_}'\(.*\)/\1/' | sort | while read a; do
     if ! contains "$a" "${CMDS[@]}"; then
       if [ "$(type -t "HELP_$a")" == "function" ]; then
         eval HELP_$a
@@ -107,31 +131,47 @@ CMDS_list_commands()
 CMDS_help_command()
 {
   if [ "$(type -t "HELP_$1")" == "function" ]; then
-    HELP_$1 | CMDS_format_help
+    HELP_$1 | CMDS_format_help X
   else
     QUIET=X
     if [ "$(type -t "HELP_$1")" == "function" ]; then
-      HELP_$1 | CMDS_format_help
+      HELP_$1 | CMDS_format_help X
     else
       echo "no help found for '$1'"
     fi
   fi
 }
 
+#
+# $1: if set the description body will be shown also
+#     otherwise only the synopsis and option summary is shown
+#
 CMDS_format_help()
 {
   local txt
-  while IFS=":" read -r a b; do
-    c="$(trim "$a")"
-    if [ "$c" = "$a" ]; then
-      printf -v txt "%-30s %s" "$a" "$b"
-    else
-      printf -v txt "  %-13s %s" "$c" "$b"
+  local body
+  while IFS= read -r line; do
+    if [ -z "$line" ]; then
+      body=X
+      if [ -z "$1" ]; then
+        return
+      fi
     fi
-    if [ -z "$c" -o "$c" != "$a" ]; then
-      found "  $txt"
+    if [ -z "$body" ]; then
+      IFS=":" read -r a b <<<"$line"
+      c="$(trim "$a")"
+      if [ "$c" = "$a" ]; then
+        printf -v txt "%-30s %s" "$a" "$b"
+      else
+        printf -v txt "  %-13s %s" "$c" "$b"
+      fi
+      if [ -z "$c" -o "$c" != "$a" ]; then
+        found "  $txt"
+      else
+        info  "  $txt"
+      fi
     else
-      info  "  $txt"
+      echo "$line"
     fi
   done
 }
