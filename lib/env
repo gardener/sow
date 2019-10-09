@@ -112,7 +112,9 @@ getTemplateJSON()
 
 getComponentJSON()
 {
-  COMPONENTJSON="$(spiff merge --json "$1" "$SOWLIB/templates/component.yaml" "$CONFIG" - <<<'{ "env": { "COMPONENT": "'"$2"'", "PRODUCT": "'"$3"'" }}' )"
+  local stubs=( )
+  setStubs stubs "lib/templates/component.yaml"
+  COMPONENTJSON="$(spiff merge --json "$1" "${stubs[@]}" "$CONFIG" - <<<'{ "env": { "COMPONENT": "'"$2"'", "PRODUCT": "'"$3"'" }}' )"
   if [ -z "$COMPONENTJSON" ]; then
     COMPONENTJSON="{}"
   fi

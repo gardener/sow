@@ -817,13 +817,19 @@ jsonAddString()
 ################################################################################
 
 lookupFileIn() {
+  local all
   local opt="-f"
-  case "$1" in
-    -d) opt="-d"
-        shift;;
-    -x) opt="-x"
-        shift;;
-  esac
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      -d) opt="-d"
+          shift;;
+      -x) opt="-x"
+          shift;;
+      -a) all=x
+          shift;;
+      *)  break;;
+    esac
+  done
   local file="$1"
   shift
   if [[ "$file" = /* ]]; then
@@ -832,7 +838,9 @@ lookupFileIn() {
     for d in "$@"; do
       if [ $opt "$d/$file" ]; then
         echo "$d/$file"
-        return
+        if [ -z "$all" ]; then
+          return
+        fi
       fi
     done
   fi
@@ -867,6 +875,14 @@ lookupStub() {
   local dirs=( )
   productDirs dirs
   lookupFileIn "$1" "${dirs[@]}" "$CURRENT"  "$ROOT" "$SOW"
+}
+
+setStubs() {
+  local dirs=( )
+  productDirs dirs
+  while IFS= read -r line; do 
+    eval $1="( \"\$line\" \"\${$1[@]}\" )"
+  done <<<"$(lookupFileIn -a "$2" "${dirs[@]}" "$CURRENT" "$ROOT" "$SOW")"
 }
 
 ################################################################################
