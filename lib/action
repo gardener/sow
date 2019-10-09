@@ -556,9 +556,10 @@ handle_exports()
         if [ ! -d "$dirname" ]; then
           mkdir -p "$dirname"
         fi
+        rm -f "$file"
         echo "$data" > "$file"
         if [ -n "$mode" ]; then
-          chmod $mode $file
+          chmod "$mode" "$file"
         fi
       done
     else
