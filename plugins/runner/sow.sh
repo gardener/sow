@@ -64,29 +64,18 @@ CMD_log()
     local msg
     if [ -z "$2" ]; then
       verbose "determine runner"
-      local current=( )
-      local name
+      declare -A runners
 
-      getValueList current current LIST
-      for i in "${current[@]}"; do
-        getValue name "plugins[\"$i\"].name" LIST
-        if [ "$name" == runner ]; then
-          if [ -n "$instance" ]; then
-            header_message msg hint
-            hint " - $i"
-          else
-            msg="There are multiple runner instances in $nCOMPONENT $c
- - $i"
-            instance="$i"
-          fi
-        fi
-      done
-      if [ -z "$instance" ]; then
-        fail "no runner instance found in $nCOMPONENT $c"
-      fi
-      if [ -z "$msg" ]; then
-        exit 0
-      fi
+      getSelectedJsonMapEntries runners plugins '.name=="runner"' LIST
+      case ${#runners[@]} in
+        0) fail "no runner instance found in $nCOMPONENT $c";;
+        1) instance="${!runners[@]}";;
+        *) hint "There are multiple runner instances in $nCOMPONENT $c"
+           for i in "${!runners[@]}"; do
+             hint "- $i"
+           done
+           exit 0;;
+      esac
     else
       getValue name "plugins[\"$2\"].name"  LIST
       if [ -z "$name" ]; then
