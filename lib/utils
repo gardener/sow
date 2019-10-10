@@ -16,7 +16,7 @@
 
 set -e
 
-source "$SOWLIB/stdio"
+source "$(dirname "$BASH_SOURCE")/stdio"
 
 ################################################################################
 # standard error handling
@@ -450,6 +450,38 @@ _jq_get_json_list_for_shell()
   jq -r '(('"$1"') // empty) | if type == "array" then . elif type != "object" then error("expected list for '"$value"'") else [.] end | .[] | tojson | @sh'
 }
 
+_jq_get_json_map_for_shell()
+{
+  local value="$(echo "${3:-$1}" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"
+  jq -r '(('"$1"') // empty) | if type == "array" then . elif type != "object" then error("expected list for '"$value"'") else [.] end | .[] | tojson | @sh'
+}
+
+_JQ_SHELLVALUE='if type == "object" or type == "array" then tojson else . end | @sh'
+
+#
+# get list of map fields formatted to assigned to an associative array
+#
+_jq_get_json_map_for_shell()
+{ 
+  local value="$(echo "${2:-$1}" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"
+  jq -r '('"$1"') // {} | if type == "object" then . as $m | keys[] | ["[", (.|@sh) , "]=", ($m[.]|'"$_JQ_SHELLVALUE"')] | join("") else error("expected map for '"$value"'")  end'
+}
+
+#
+# get list of map fields of type map formatted to assigned to an associative
+# array matching a selection criteria
+#
+# $1: map expression
+# $2: jq select expression
+# [$3]: field description for error message
+#
+_jq_get_selected_json_map_entries_for_shell()
+{ 
+  local value="$(echo "${3:-$1}" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"
+  jq -r '('"$1"') // {} | if type == "object" then . as $m | keys[] | . as $k | $m[.] | select('"$2"') | ["[", ($k|@sh) , "]=", (.|'"$_JQ_SHELLVALUE"')] | join("") else error("expected map for '"$value"'")  end'
+}
+
+
 #
 # extract a label mapping list from json
 # supporting different formats: lists, objects or single values
@@ -557,6 +589,27 @@ _get_value_or_json() {
   eval $1="( $v )"
 }
 
+_get_json_map()
+{
+  __get _jq_get_json_map_for_shell "${@:2}"
+  eval $1="( $v )"
+}
+
+getJsonMap() {
+  local v
+  _get_json_map "$@"
+}
+
+_get_selected_json_map_entries()
+{
+  __get _jq_get_selected_json_map_entries_for_shell "$2" "$4" "$3" "${@:5}"
+  eval $1="( $v )"
+}
+
+getSelectedJsonMapEntries() {
+  local v
+  _get_selected_json_map_entries "$@"
+}
 
 _get_config_value() {
   _get_value "$@" <<<"$CONFIGJSON"
