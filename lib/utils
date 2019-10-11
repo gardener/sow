@@ -722,7 +722,7 @@ lookupFileIn() {
   esac
   local file="$1"
   shift
-  if [[ "$DIR" = /* ]]; then
+  if [[ "$file" = /* ]]; then
     echo "$file"
   else
     for d in "$@"; do
