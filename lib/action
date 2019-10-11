@@ -452,7 +452,11 @@ exec_plugin()
   getValueList args args spec
   
   if [ -z "$cpath" ]; then
-    cpath="$name"
+    if [ ${#args[@]} -gt 0 ]; then
+      cpath="${args[0]}"
+    else
+      cpath="$name"
+    fi
   fi
   if [ -z "$key" ]; then
     key="$cpath"

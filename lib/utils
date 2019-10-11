@@ -752,21 +752,21 @@ getValueMap() {
 
 deljsonkey() {
     local v
-    v="$(eval echo \"\${"$1"}\" | jq 'del(.'$2')')"
-    eval $1=\'"$v"\'
+    v="$(echo "${!1}" | jq -r 'del(.'$2') | tojson |@sh')"
+    eval $1="$v"
 }
 
 setjsonvalue() {
     local value="$(echo "$3" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"
     local v
-    v="$(eval echo \"\${"$1"}\" | jq '.'$2'="'"$value"'"')"
-    eval $1=\'"$v"\'
+    v="$(echo "${!1}" | jq -r '.'$2'="'"$value"'" | tojson |@sh')"
+    eval $1="$v"
 }
 
 setjsonjson() {
     local v
-    v="$(eval echo \"\${"$1"}\" | jq -s '.[0].'"$2"'=.[1] | .[0]' - <( echo "$3"))"
-    eval $1=\'"$v"\'
+    v="$(echo "${!1}" | jq -sr '.[0].'"$2"'=.[1] | .[0] | tojson |@sh' - <( echo "${3}"))"
+    eval $1="$v"
 }
 
 getjsonvalue() {
