@@ -14,7 +14,7 @@
 
 
 utilities:
-  <<: (( &temporary(merge || ~) ))
+  <<: (( &inject &temporary(merge || ~) ))
 
   graph:
     <<: (( &temporary ))
@@ -26,8 +26,11 @@ utilities:
 
     normcycle: (( |cycle|->($min=_.min(cycle)) min ? sum[cycle|cycle|s,e|->s.[0] == min ? s :(s.[1..] [s.[1]])] :cycle  ))
     cycle: (( |list|->list ? ($elem=list.[length(list) - 1]) _.normcycle(sum[list|[]|s,e|->s ? s [e] :e == elem ? [e] :s]) :list ))
-    norm: (( |model,comp,deps|->($d= _.maxorder(deps.deps)) { $deps=d, $err=_.cycle(deps.err), $order=_.reverse([comp] d), $missing=_.missing(model,comp) } ))
-    reverse: (( |list|->sum[list|[]|s,e|->[e] s] ))
+    #norm: (( |model,comp,deps|->($d= _.maxorder(deps.deps)) { $deps=d, $err=_.cycle(deps.err), $order=reverse([comp] d), $missing=_.missing(model,comp) } ))
+    norm: (( |model,comp,deps|->($d= reverse(uniq(reverse(deps.deps)))) { $deps=d, $err=_.cycle(deps.err), $order=reverse([comp] d), $missing=_.missing(model,comp) } ))
+
+    # for compatibility
+    reverse: (( |list|->reverse(list) ))
     maxmap: (( |list|-> sum[list|{}|s,idx,v|-> s {v = idx}] )) 
     maxorder: (( |list|-> ($mm=_.maxmap(list)) sum[list|[]|s,idx,v|-> s (idx == mm[v] ? v :~~)] ))
 
@@ -35,5 +38,5 @@ utilities:
 
     evaluate: (( |model|->sum[model|{}|s,k,v|->s { k=_.norm(model,k,_._dep(model,k,[]))}] ))
     cycles: (( |result|->uniq(sum[result|[]|s,k,v|-> v.err ? s [v.err] :s]) ))
-    order: (( |result|->uniq(_.reverse(sum[result|[]|s,k,v|->s [k] v.deps])) ))
+    order: (( |result|->uniq(reverse(sum[result|[]|s,k,v|->s [k] v.deps])) ))
 
