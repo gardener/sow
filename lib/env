@@ -122,7 +122,7 @@ getComponentJSON()
 
 getImports()
 {
-  _get_labeled_value_list $1 .component.imports <<<"${!2}"
+  getLabeledValueList $1 component.imports $2
 }
 
 

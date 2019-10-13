@@ -147,9 +147,13 @@ startRunner()
     getValue hash hash state
     if [ "$hash" == "$1" ]; then
        getValue pid pid state
-       if [ -n "$pid" ] && kill -0 $pid 2>/dev/null; then
-         info "instance $PLUGININSTANCE still running with pid $pid"
-         return
+       if [ -n "$pid" ]; then
+         if kill -0 $pid 2>/dev/null; then
+           info "instance $PLUGININSTANCE still running with pid $pid"
+           return
+         else
+           info "instance $PLUGININSTANCE should be running with pid $pid, but has stoped"
+         fi
        fi
     fi
   fi

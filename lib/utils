@@ -453,7 +453,7 @@ _jq_get_json_list_for_shell()
 _jq_get_json_map_for_shell()
 {
   local value="$(echo "${3:-$1}" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"
-  jq -r '(('"$1"') // empty) | if type == "array" then . elif type != "object" then error("expected list for '"$value"'") else [.] end | .[] | tojson | @sh'
+  jq -r '(('"$1"') // empty) | if type == "array" then . elif type != "object" then error("expected map for '"$value"'") else [.] end | .[] | tojson | @sh'
 }
 
 _JQ_SHELLVALUE='if type == "object" or type == "array" then tojson else . end | @sh'
@@ -486,20 +486,22 @@ _jq_get_selected_json_map_entries_for_shell()
 # extract a label mapping list from json
 # supporting different formats: lists, objects or single values
 # result:   sequence of "<label> <value>" pairs
+# result:   sequence of bash associative array litaral entries
 #
 _jq_get_labeled_value_list()
 {
-  jq -r '('$1' // empty) | if type == "object" then . as $m | keys[] | [.,$m[.]] elif type == "array" then .[] | if type == "object" then . as $m | keys[] | [.,$m[.]] else [.,.] end else . end | join("  ")'
+  jq -r '('$1' // []) | if type == "object" then . as $m | keys[] | [.,$m[.]] elif type == "array" then .[] | if type == "object" then . as $m | keys[] | [.,$m[.]] else [.,.] end else . end | ["[", (.[0]|@sh) , "]=", (.[1]|'"$_JQ_SHELLVALUE"')] | join("")'
 }
+
 
 #
 # extract a sequence of labeled arg lists from json
 # result: sequence of "<arg1>" .. "<argn>" tupels
 #
-_jq_get_labeled_arg_list()
-{
-  jq -r '('$1' // empty) | if type == "array" then .[] | if type == "object" then . as $m | keys[] | [ .,  ($m[.] | if type == "array" then .[] else . end)] else [.] end elif type == "object" then . as $m | keys[] | [ ., $m[.][]] else [.] end | @sh '
-}
+#_jq_get_labeled_arg_list()
+#{
+#  jq -r '('$1' // empty) | if type == "array" then .[] | if type == "object" then . as $m | keys[] | [ .,  ($m[.] | if type == "array" then .[] else . end)] else [.] end elif type == "object" then . as $m | keys[] | [ ., $m[.][]] else [.] end | @sh '
+#}
 
 #
 # extract a sequence of plugin specs
@@ -549,12 +551,6 @@ _jq_get_plugin_list_for_shell()
 }
 
 
-#
-# get a json field mapped to a string mapping
-_get_labeled_value_list()
-{
-  _read_hash $1 < <(_jq_get_labeled_value_list "$2")
-}
 
 __get() {
   if [ -n "$3" ]; then
@@ -606,9 +602,24 @@ _get_selected_json_map_entries()
   eval $1="( $v )"
 }
 
-getSelectedJsonMapEntries() {
+getSelectedJsonMapEntries()
+{
   local v
   _get_selected_json_map_entries "$@"
+}
+
+#
+# get a json field mapped to a string mapping
+_get_labeled_value_list()
+{
+  __get _jq_get_labeled_value_list "${@:2}"
+  eval $1="( $v )"
+}
+
+getLabeledValueList()
+{
+  local v
+  _get_labeled_value_list "$@"
 }
 
 _get_config_value() {
