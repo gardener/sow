@@ -817,9 +817,9 @@ jsonAdd()
 jsonAddString()
 {
   if [ $# -eq 3 ]; then
-    jsonAdd "$1" "$2" "\"$3\""
+    jsonAdd "$1" "${2//\"/\\\"}" "\"${3//\"/\\\"}\""
   else
-    jsonAdd "$1" "\"$2\""
+    jsonAdd "$1" "\"${2//\"/\\\"}\""
   fi
 }
 
@@ -910,8 +910,7 @@ PLUGIN_setup()
     SETTINGSJSON="$(cat "$DEPLOYMEMT")"
   fi
   if [ -z "$PLUGINCONFIG" ]; then
-    verbose "getting config from settings field $PLUGININSTANCE"
-    PLUGINCONFIGJSON="$(spiff merge --json --path "$PLUGININSTANCE" - <<< "$SETTINGSJSON")"
+    PLUGINCONFIGJSON="{}"
   else
     PLUGINCONFIGJSON="$(cat "$PLUGINCONFIG")"
   fi

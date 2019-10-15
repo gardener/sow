@@ -286,7 +286,8 @@ has to disable the auto.merge, also, by adding a `merge none` expression.
 
 The generated effective deployment manifest should contain a `plugins` node
 listing the plugins that should be executed.  A plugin entry may take
-additional string arguments and a configuration.
+a single string argument, additional string arguments as list or a
+configuration object.
 
 ```yaml
 plugins:
@@ -301,25 +302,35 @@ plugins:
   - echo:
      - "Happy"
      - "sowing"
-  - echo:    # this is the complete form for specifying a plugin
-     config: 
-     path: echo
+  - echo:    # this is the object form for specifying a plugin
      args:
        - "Happy"
        - "sowing"
 ```
 
-By convention, if arguments are used and the plugin requires a configuration
-the first argument describes the path of the yaml node that
-contains the configuration for the plugin call. By default a plugin
-should assume its name as path. The better way is to specify the
-configuration directly in the plugin node as described above.
+The config object may contain the following fieds:
+
+- `key`: the instance key for the plugin executions (typically used
+  by the plugin to generate a sub folder for keeping state and temporary data)
+- `path`: the config path for the instance config in the deployment manifest
+- `config`: the instance config as part of the object
+- `args`: plugin arguments as list of strings
+
+If only arguments are used for non-builtin plugins or no explicit key is given
+the first argument (or, for no arguments, the plugin name) describes the key of
+the plugin instance and optionally the path of the yaml node that contains the
+configuration for the plugin call.
+The syntax here is "<key>:<path>", any part may be empty. If the key
+part is empty the plugin name is used. If the path is empty no configuration
+is used if the `config` field is not set.
+
+The chosen keys must be unique for a component (built-plugins don't use keys).
 
 The denoted path should contain the actual configuration for
 the plugin. This way the same plugin can be called multiple times
 with different settings.
 
-If a `path` is given it is used as sub folder to store information
+The key is used as sub folder to store information
 for the actual plugin execution, to separate multiple occurrences
 of a plugin in the plugin list. By default the plugin name should be
 used as `dir`
@@ -349,7 +360,10 @@ If multiple plugins can be be executed in parallel, the build-in plugin
 plugins.
 
 The `pinned` and `unpinned` plugins can be used inside `parallel` to include
-a list of pligins with a defined execution order.
+a list of plugins with a defined execution order.
+
+If the list of external plugin instance is changed, the vanished instances
+will automatically be deleted after the deployment.
 
 #### Built-in Plugins
 
