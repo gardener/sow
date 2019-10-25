@@ -66,9 +66,7 @@ utilities:
           name: current
         users:
         - name: (( values.username))
-          user:
-            client-certificate-data: (( base64(values.cert) ))
-            client-key-data: (( base64(values.key) ))
+          user: (( { "token" = values.token } || { "client-certificate-data" = base64(values.cert), "client-key-data" = base64(values.key) } ))
 
     kubeconfig: (( lambda |values|-> *_.templates.kubeconfig ))
 
