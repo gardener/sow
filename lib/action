@@ -33,6 +33,24 @@ ACTION_setup()
   getComponentMetaProduct PRODUCT comp
   getMetaProductDir PRODUCTDIR "$PRODUCT"
 
+  DEPLOYEDVERSION=""
+  SPECVERSION=""
+  MIGRATE=""
+  if [ -n "${VERSIONS["$PRODUCT"]}" ]; then
+    SPECVERSION="${VERSIONS["$PRODUCT"]}"
+    if [ -f "$STATE/$COMPONENT/$fSPECVERSION" ]; then
+      DEPLOYEDVERSION="$(cat "$STATE/$COMPONENT/$fSPECVERSION")"
+    else
+      DEPLOYEDVERSION=0
+    fi
+    if [ $SPECVERSION -ne $DEPLOYEDVERSION ]; then
+      MIGRATE="true"
+    fi
+  fi
+  export SPECVERSION
+  export DEPLOYEDVERSION
+  export MIGRATE
+
   export CURRENT="$ROOT/$CURRENT"
   export PRODUCTDIR="$ROOT/$PRODUCTDIR"
   export PRODUCT

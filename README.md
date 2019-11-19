@@ -114,6 +114,8 @@ a kubernetes cluster.
 ├── acre.yaml                  # config of the concrete installation instance
 ├── crop                       # the installation source for the landscape
 │   ├── acre.yaml
+│   ├── SPEC-VERSION           # optional file containing the specification
+│   │                          # version of the installation source
 │   ├── components             # components of the root installation source
 │   │   ├── comp1
 │   │   │   ├── component.yaml
@@ -141,6 +143,8 @@ a kubernetes cluster.
 │   │
 │   └── greenhouses           # recursively included installation sources
 │       └── nestedproduct     # name as root of the installation source
+│           ├── SPEC-VERSION  # optional file containing the specification
+│           │                 # version of the nested product
 │           ├── other product folders (see above)
 │           └── components
 │               ├── testcomp
@@ -271,6 +275,9 @@ actual component environment:
 - `ROOTPRODUCTDIR`: installation source directory
 - `PRODUCT`: in case of nested products the product name
 - `PRODUCTDIR`: the root directory of the component's product
+- `SPECVERSION`: the specification version of the component's product
+- `DEPLOYEDVERSION`: the actually deployed specification version of the component's product
+- `MIGRATION`: a boolean indicating that migration steps should be executed (see [Migrations](#Migrations))
 
 _sow_ evaluates the dependencies and generates an additional stub file
 containing the exports of all imported components.
@@ -576,3 +583,24 @@ The evaluation of environment and arguments alone is done by the shell function
 Additionally it loads the standard utils library from the _sow_ tool, that
 offers functions for (colored) output and json access
 (see [lib/utils](lib/utils)).
+
+## Migrations
+
+A product may declare a specification version using the file `SPEC-VERSION`.
+It must contain a plain number that should be incemented by one if a new version of the product requires a migration step for at least one contained component.
+
+If this file exsits all deployed components of a such a product remember their deployed specification version in their state directory.
+
+The processing of the `deployment.yaml` of a component has access to the actual
+[processing environment](#deploymentyaml), which provides information about the already deployed specification version of the component and the actual version. Addtionally a migration flag is provided. If a component requires a dedicated migration step, the plugin set must be configured accordingly by the expressions contained in the `deployment.yaml`. 
+
+Not for every change a dedicated migration step is required. This depends on the used plugins. For example, the kubectl plugin is able to handle api group changes, additing and deleting of deploy objects out of the box. But if the migration of content is required, this must potentially be explicitly handled.
+
+A possible strategy here is to add a component local custom plugin to handle migration steps prior to the regular plugins. 
+
+In general upgrades must be done version by version. Therefore a check is included, that prevents upgrades spanning more than one specification version.
+
+If a new specification version is introduced the codebase of the product must remove all the previous migrations and add the newly required ones.
+
+The product version is potentially much finer than the specification version.
+Therefore it is possible to skip the installation of version updates of a product as long as the specification version described by the product version does not change.

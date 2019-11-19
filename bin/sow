@@ -54,6 +54,8 @@ help()
   info "  show [-l]{<components>}        show info about $nCOMPONENTS"
   found "    -l            show extended $nCOMPONENT info"
   info "  deploy [-aAmn] {<components>}  deploy $nCOMPONENTS"
+  found "    --force       skip missing older migration steps"
+  found "                  (ATTENTION: you should know what you are doing)"
   found "    --parallel <n> deploy components with a maximum of n in parallel"
   found "    -u            update dependent $nCOMPONENTS"
   info "  delete [-aAm] {<components>}   delete deployment of $nCOMPONENTS"
@@ -143,7 +145,7 @@ componentStub()
   jsonAddString __stub EXPORTDIR "$EXPORTDIR"
   local curvers="${VERSIONS["$PRODUCT"]}"
   if [ -n "$curvers" ]; then
-    jsonAdd __stub VERSION "$curvers"
+    jsonAdd __stub SPECVERSION "$curvers"
     local deployed=0
     if [ -f "$STATEDIR/$fSPECVERSION" ]; then
       deployed="$(cat "$STATEDIR/$fSPECVERSION")"
@@ -201,7 +203,7 @@ setupProductMeta()
       fail "production version '$curvers' for $product is no number"
     fi
     VERSIONS["$product"]="$curvers"
-    jsonAddString jprod version "$curvers"
+    jsonAdd jprod specversion "$curvers"
   fi
   jsonAddString jprod dir "$rel"
   jsonAdd JMETAPRODS "$product" "{ $jprod }"
@@ -288,6 +290,18 @@ setupComponentMeta()
   done
   jsonAdd jattr imports "[ $jdeps ]"
 
+  if [ -n "${VERSIONS["$product"]}" ]; then
+    jsonAdd jattr specversion "${VERSIONS["$product"]}"
+    if [ -f "$STATE/$component/$fSPECVERSION" ]; then
+      local v="$(cat "$STATE/$component/$fSPECVERSION")"
+      if ! _is_number "$v"; then
+        fail "specification version '$v' of component $component is no number"
+      fi
+      jsonAdd jattr deployedversion $v
+    else
+      jsonAdd jattr deployedversion 0
+    fi
+  fi
   jsonAdd JMETACOMPS "$component" "{ $jattr }"
   if [ $active == true ]; then
     jsonAdd JMETAGRAPH "$component" "[ $jgraph ]"
