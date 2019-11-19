@@ -242,6 +242,15 @@ _is_function()
    [ "$(type -t "$1")" == function ]
 }
 
+_is_number()
+{
+  if [[ "$1" =~ ^[0-9]+$ ]]; then
+    return 0
+  else
+    return 1
+  fi
+}
+
 #
 # res: result associative array
 # read successive lines with key and value

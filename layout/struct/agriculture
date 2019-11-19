@@ -7,3 +7,5 @@ fCOMPDEF=species.yaml
 fACTIONDEF=guide.yaml
 dROOTPRODUCT=crop 
 dPRODUCTS=greenhouses
+
+fSPECVERSION=SPEC-VERSION

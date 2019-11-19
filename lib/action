@@ -182,7 +182,7 @@ action_deployment()
   ######################
 
   local env=""
-  componentStub env
+  componentStub env "$action"
   echo "$env" >"$GENDIR/env.json"
 
   ############################
@@ -291,6 +291,9 @@ setState()
   errorHandler=( )
   if [ -n "$deployState" -a -d "$STATE/$COMPONENT" ]; then
     echo "$deployState" > "$STATE/$COMPONENT/state.info"
+    if [ "$deployState" == deployed -a -n "${VERSIONS["$PRODUCT"]}" ]; then
+      echo "${VERSIONS["$PRODUCT"]}" > "$STATE/$COMPONENT/$fSPECVERSION"
+    fi
   fi
 }
 
