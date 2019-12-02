@@ -523,7 +523,7 @@ exec_plugin()
     fi
   fi
   if [ -n "${config}" ]; then
-    export PLUGINCONFIG="$GENDIR/pluginconfig-$$.json"
+    export PLUGINCONFIG="$GENDIR/pluginconfig-${BASHPID}.json"
     echo "${config}" >"$PLUGINCONFIG"
   else
     export PLUGINCONFIG=
@@ -536,7 +536,14 @@ exec_plugin()
   local s=0
   if [ -n "$name" ]; then
     if _is_function "${name}"; then
+        (
+        if [ -n "${config}" ]; then
+          PLUGINCONFIGJSON="${config}"
+        else
+          PLUGINCONFIGJSON="{}"
+        fi
         __exec_plugin "${name}" "${key}" "${name}" "${plugin_opts[@]}" "$action" "${args[@]}"
+        )
     else
        local plugin
        plugin="$(lookupPlugin "${name}")"
@@ -591,7 +598,7 @@ _exec_plugin()
   
   export DEPLOYMEMT=
 
-  export PLUGINCONFIG="$GENDIR/pluginconfig-$$.json"
+  export PLUGINCONFIG="$GENDIR/pluginconfig-${BASHPID}.json"
   echo "${config}" >"$PLUGINCONFIG"
    
   PLUGININSTANCE="$key"
