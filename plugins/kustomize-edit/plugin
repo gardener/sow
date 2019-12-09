@@ -18,23 +18,28 @@ source "$SOWLIB/pluginutils"
 
 set -eo pipefail
 
-getRequiredValue "path" "path" PLUGINCONFIGJSON
-getValueList editArgs "args" PLUGINCONFIGJSON
+getRequiredValue path "path" PLUGINCONFIGJSON # path to root directory of kustomize repo
+getRequiredValue kustomization "kustomization" PLUGINCONFIGJSON # path to directory containing kustomization.yaml file, relative to $path
+getValueList editArgs "args" PLUGINCONFIGJSON # arguments for 'kustomize edit' command
 
-src="$(lookupFile "$path/kustomization.yaml")"
-if [ -z "$src" ]; then
-    fail "kustomization.yaml not found in directory '$path'"
+fullpath="$path/$kustomization"
+if [[ ! -f "$fullpath/kustomization.yaml" ]]; then
+    fail "kustomization.yaml not found in directory '$fullpath'"
 fi
-srcdir="$(dirname $src)"
+cpdir="$dir/edit"
 
 deploy() {
-    cd "$srcdir"
-    exec_cmd kustomize edit $(echo "${editArgs[@]}") 
-    cd - >/dev/null
+    rm -rf "$cpdir"
+    mkdir -p "$cpdir"
+    cp -R "$path/." "$cpdir/"
+    (
+        cd "$cpdir/$kustomization"
+        exec_cmd kustomize edit $(echo "${editArgs[@]}") 
+    )
 }
 
 delete() {
-    verbose "nothing to do on deletee"
+    verbose "nothing to do on delete"
 }
 
 case "$1" in

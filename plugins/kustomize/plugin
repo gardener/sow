@@ -15,30 +15,27 @@
 # limitations under the License.
 
 source "$SOWLIB/pluginutils"
-source "$SOWLIB/k8s"
 
 set -eo pipefail
 
-K8S_setKubeConfig "$PLUGININSTANCE" "$dir/kubeconfig"
-
-getRequiredValue "path" "path" PLUGINCONFIGJSON
+getRequiredValue path "path" PLUGINCONFIGJSON # path to root directory of kustomize repo
+getRequiredValue kustomization "kustomization" PLUGINCONFIGJSON # path to directory containing kustomization.yaml file, relative to $path
 getValueList kustomize_flags_deploy "flags.deploy" PLUGINCONFIGJSON
 getValueList kustomize_flags_delete "flags.delete" PLUGINCONFIGJSON
 
-src="$(lookupFile "$path/kustomization.yaml")"
-if [ -z "$src" ]; then
-    fail "kustomization.yaml not found in directory '$path'"
+fullpath="$path/$kustomization"
+if [[ ! -f "$fullpath/kustomization.yaml" ]]; then
+    fail "kustomization.yaml not found in directory '$fullpath'"
 fi
-srcdir="$(dirname $src)"
 
 deploy() {
-    info "Running kustomize build $srcdir ..."
-    exec_cmd kustomize build "$srcdir" $(echo "${kustomize_flags_deploy[@]}") | kubectl apply -f -
+    info "Running kustomize build $fullpath ..."
+    exec_cmd kustomize build "$fullpath" $(echo "${kustomize_flags_deploy[@]}") > "$dir/manifest.yaml"
 }
 
 delete() {
-    info "Running kustomize build $srcdir ..."
-    exec_cmd kustomize build "$srcdir" $(echo "${kustomize_flags_deploy[@]}") | kubectl delete -f -
+    info "Running kustomize build $fullpath ..."
+    exec_cmd kustomize build "$fullpath" $(echo "${kustomize_flags_deploy[@]}") > "$dir/manifest.yaml"
 }
 
 case "$1" in
