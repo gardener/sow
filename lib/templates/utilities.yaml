@@ -16,7 +16,7 @@
 landscape: (( &temporary ))
 
 utilities:
-  <<: (( &temporary(merge || ~) ))
+  <<: (( &inject &temporary(merge || ~) ))
 
   joinlists: (( lambda |lists|->sum[lists|[]|s,l|-> s l] ))
 

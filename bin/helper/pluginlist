@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+
+source "$SOWLIB/utils"
+
+set -e
+
+LISTFILE="$STATEDIR/plugins.json"
+LIST=
+
+if [ -f "$LISTFILE" ]; then
+  LIST="$(cat "$LISTFILE")"
+fi
+if [ -z "$LIST" ]; then
+  LIST="{ }"
+fi
+
+CURRENT=( )
+LAST=( )
+getValueList CURRENT current LIST
+getValueList LAST last LIST
+
+CMD_reset()
+{
+  deljsonkey LIST "current"
+}
+
+CMD_update()
+{
+  local json=
+  for v in "${CURRENT[@]}"; do
+    jsonAddString json "$v"
+  done
+  setjsonjson LIST "$1" "[ $json ]"
+}
+
+CMD_set()
+{
+  setjsonjson LIST "plugins.\"$1\"" "$2"
+  prependOrderedSet CURRENT "$1"
+  CMD_update current
+}
+
+CMD_del()
+{
+  removeList CURRENT "$1"
+  removeList LAST "$1"
+  deljsonkey LIST "plugins.\"$1\""
+  CMD_update current
+  CMD_update last
+}
+
+case "$1" in 
+  reset) CMD_reset;;
+  update) CMD_update last;;
+  deploy) CMD_set "$2" "$3";;
+  delete) CMD_del "$2";;
+esac
+
+echo "$LIST" > "$LISTFILE"

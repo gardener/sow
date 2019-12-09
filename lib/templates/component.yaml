@@ -22,6 +22,7 @@ utilities:
   <<: (( &inject &temporary(merge || ~) ))
 
   components:
+    <<: (( merge ))
     Optional: (( components.isEnabled(.env.COMPONENT) ))
     isEnabled: (( |c|-> contains(_.landscape.activate || [],c) ))
 

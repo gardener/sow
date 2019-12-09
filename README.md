@@ -114,6 +114,8 @@ a kubernetes cluster.
 ├── acre.yaml                  # config of the concrete installation instance
 ├── crop                       # the installation source for the landscape
 │   ├── acre.yaml
+│   ├── SPEC-VERSION           # optional file containing the specification
+│   │                          # version of the installation source
 │   ├── components             # components of the root installation source
 │   │   ├── comp1
 │   │   │   ├── component.yaml
@@ -141,6 +143,8 @@ a kubernetes cluster.
 │   │
 │   └── greenhouses           # recursively included installation sources
 │       └── nestedproduct     # name as root of the installation source
+│           ├── SPEC-VERSION  # optional file containing the specification
+│           │                 # version of the nested product
 │           ├── other product folders (see above)
 │           └── components
 │               ├── testcomp
@@ -271,6 +275,9 @@ actual component environment:
 - `ROOTPRODUCTDIR`: installation source directory
 - `PRODUCT`: in case of nested products the product name
 - `PRODUCTDIR`: the root directory of the component's product
+- `SPECVERSION`: the specification version of the component's product
+- `DEPLOYEDVERSION`: the actually deployed specification version of the component's product
+- `MIGRATION`: a boolean indicating that migration steps should be executed (see [Migrations](#Migrations))
 
 _sow_ evaluates the dependencies and generates an additional stub file
 containing the exports of all imported components.
@@ -286,7 +293,8 @@ has to disable the auto.merge, also, by adding a `merge none` expression.
 
 The generated effective deployment manifest should contain a `plugins` node
 listing the plugins that should be executed.  A plugin entry may take
-additional string arguments and a configuration.
+a single string argument, additional string arguments as list or a
+configuration object.
 
 ```yaml
 plugins:
@@ -301,25 +309,35 @@ plugins:
   - echo:
      - "Happy"
      - "sowing"
-  - echo:    # this is the complete form for specifying a plugin
-     config: 
-     path: echo
+  - echo:    # this is the object form for specifying a plugin
      args:
        - "Happy"
        - "sowing"
 ```
 
-By convention, if arguments are used and the plugin requires a configuration
-the first argument describes the path of the yaml node that
-contains the configuration for the plugin call. By default a plugin
-should assume its name as path. The better way is to specify the
-configuration directly in the plugin node as described above.
+The config object may contain the following fieds:
+
+- `key`: the instance key for the plugin executions (typically used
+  by the plugin to generate a sub folder for keeping state and temporary data)
+- `path`: the config path for the instance config in the deployment manifest
+- `config`: the instance config as part of the object
+- `args`: plugin arguments as list of strings
+
+If only arguments are used for non-builtin plugins or no explicit key is given
+the first argument (or, for no arguments, the plugin name) describes the key of
+the plugin instance and optionally the path of the yaml node that contains the
+configuration for the plugin call.
+The syntax here is "<key>:<path>", any part may be empty. If the key
+part is empty the plugin name is used. If the path is empty no configuration
+is used if the `config` field is not set.
+
+The chosen keys must be unique for a component (built-plugins don't use keys).
 
 The denoted path should contain the actual configuration for
 the plugin. This way the same plugin can be called multiple times
 with different settings.
 
-If a `path` is given it is used as sub folder to store information
+The key is used as sub folder to store information
 for the actual plugin execution, to separate multiple occurrences
 of a plugin in the plugin list. By default the plugin name should be
 used as `dir`
@@ -349,7 +367,10 @@ If multiple plugins can be be executed in parallel, the build-in plugin
 plugins.
 
 The `pinned` and `unpinned` plugins can be used inside `parallel` to include
-a list of pligins with a defined execution order.
+a list of plugins with a defined execution order.
+
+If the list of external plugin instance is changed, the vanished instances
+will automatically be deleted after the deployment.
 
 #### Built-in Plugins
 
@@ -562,3 +583,24 @@ The evaluation of environment and arguments alone is done by the shell function
 Additionally it loads the standard utils library from the _sow_ tool, that
 offers functions for (colored) output and json access
 (see [lib/utils](lib/utils)).
+
+## Migrations
+
+A product may declare a specification version using the file `SPEC-VERSION`.
+It must contain a plain number that should be incemented by one if a new version of the product requires a migration step for at least one contained component.
+
+If this file exsits all deployed components of a such a product remember their deployed specification version in their state directory.
+
+The processing of the `deployment.yaml` of a component has access to the actual
+[processing environment](#deploymentyaml), which provides information about the already deployed specification version of the component and the actual version. Addtionally a migration flag is provided. If a component requires a dedicated migration step, the plugin set must be configured accordingly by the expressions contained in the `deployment.yaml`. 
+
+Not for every change a dedicated migration step is required. This depends on the used plugins. For example, the kubectl plugin is able to handle api group changes, additing and deleting of deploy objects out of the box. But if the migration of content is required, this must potentially be explicitly handled.
+
+A possible strategy here is to add a component local custom plugin to handle migration steps prior to the regular plugins. 
+
+In general upgrades must be done version by version. Therefore a check is included, that prevents upgrades spanning more than one specification version.
+
+If a new specification version is introduced the codebase of the product must remove all the previous migrations and add the newly required ones.
+
+The product version is potentially much finer than the specification version.
+Therefore it is possible to skip the installation of version updates of a product as long as the specification version described by the product version does not change.

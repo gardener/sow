@@ -147,9 +147,13 @@ startRunner()
     getValue hash hash state
     if [ "$hash" == "$1" ]; then
        getValue pid pid state
-       if [ -n "$pid" ] && kill -0 $pid 2>/dev/null; then
-         info "instance $PLUGININSTANCE still running with pid $pid"
-         return
+       if [ -n "$pid" ]; then
+         if kill -0 $pid 2>/dev/null; then
+           info "instance $PLUGININSTANCE still running with pid $pid"
+           return
+         else
+           info "instance $PLUGININSTANCE should be running with pid $pid, but has stoped"
+         fi
        fi
     fi
   fi
@@ -165,12 +169,19 @@ startRunner()
     echo >"$STATEFILE"
   )&
   pid=$!
-  sleep $startup
-  if ! kill -0 $pid 2>/dev/null; then
-    cat "$dir/log"
-    fail "command execution failed"
-  fi
+  # check for startup seconds for failing command execution
+  verbose "startup time to check successful execution is $startup seconds"
+  while (( startup >= 0 )); do
+    if ! kill -0 $pid 2>/dev/null; then
+      cat "$dir/log"
+      fail "command execution failed"
+    fi
+    if (( startup-- > 0 )); then
+      sleep 1
+    fi
+  done
   info "pid for instance $PLUGININSTANCE is $pid"
+  hint "command log can be found at '$dir/log'"
   local __data
   jsonAddString __data pid "$pid"
   jsonAddString __data hash "$1"

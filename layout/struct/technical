@@ -7,3 +7,5 @@ fCOMPDEF=component.yaml
 fACTIONDEF=deployment.yaml
 dROOTPRODUCT=product
 dPRODUCTS=products
+
+fSPECVERSION=SPEC-VERSION

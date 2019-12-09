@@ -16,7 +16,7 @@
 
 set -e
 
-source "$SOWLIB/stdio"
+source "$(dirname "$BASH_SOURCE")/stdio"
 
 ################################################################################
 # standard error handling
@@ -242,6 +242,15 @@ _is_function()
    [ "$(type -t "$1")" == function ]
 }
 
+_is_number()
+{
+  if [[ "$1" =~ ^[0-9]+$ ]]; then
+    return 0
+  else
+    return 1
+  fi
+}
+
 #
 # res: result associative array
 # read successive lines with key and value
@@ -293,6 +302,57 @@ addHashed()
   for v in "${@:2}"; do
     eval "$1[\"$v\"]=X"
   done
+}
+
+prependOrderedSet()
+{
+  local a=( )
+  eval a="( \"\${$1[@]}\" )"
+  local o
+  for o in "${@:2}"; do
+    if ! contains "$o" "${a[@]}"; then
+      a=( "$o" "${a[@]}" )   
+    fi
+  done
+  eval "$1"="( \"\${a[@]}\" )"
+}
+
+appendOrderedSet()
+{
+  local a=( )
+  eval a="( \"\${$1[@]}\" )"
+  local o
+  for o in "${@:2}"; do
+    if ! contains "$o" "${a[@]}"; then
+      a=( "${a[@]}" "$o" )   
+    fi
+  done
+  eval "$1"="( \"\${a[@]}\" )"
+}
+
+appendList()
+{
+  local a=( )
+  eval a="( \"\${$1[@]}\" )"
+  local o
+  for o in "${@:2}"; do
+    a=( "${a[@]}" "$o" )   
+  done
+  eval "$1"="( \"\${a[@]}\" )"
+}
+
+removeList()
+{
+  local a=( )
+  eval a="( \"\${$1[@]}\" )"
+  local n=( )
+  local o
+  for o in "${a[@]}"; do
+    if ! contains "$o" "${@:2}"; then
+      n=( "${n[@]}" "$o" )   
+    fi
+  done
+  eval "$1"="( \"\${n[@]}\" )"
 }
 
 setReverse()
@@ -399,24 +459,58 @@ _jq_get_json_list_for_shell()
   jq -r '(('"$1"') // empty) | if type == "array" then . elif type != "object" then error("expected list for '"$value"'") else [.] end | .[] | tojson | @sh'
 }
 
+_jq_get_json_map_for_shell()
+{
+  local value="$(echo "${3:-$1}" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"
+  jq -r '(('"$1"') // empty) | if type == "array" then . elif type != "object" then error("expected map for '"$value"'") else [.] end | .[] | tojson | @sh'
+}
+
+_JQ_SHELLVALUE='if type == "object" or type == "array" then tojson else . end | @sh'
+
+#
+# get list of map fields formatted to assigned to an associative array
+#
+_jq_get_json_map_for_shell()
+{ 
+  local value="$(echo "${2:-$1}" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"
+  jq -r '('"$1"') // {} | if type == "object" then . as $m | keys[] | ["[", (.|@sh) , "]=", ($m[.]|'"$_JQ_SHELLVALUE"')] | join("") else error("expected map for '"$value"'")  end'
+}
+
+#
+# get list of map fields of type map formatted to assigned to an associative
+# array matching a selection criteria
+#
+# $1: map expression
+# $2: jq select expression
+# [$3]: field description for error message
+#
+_jq_get_selected_json_map_entries_for_shell()
+{ 
+  local value="$(echo "${3:-$1}" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"
+  jq -r '('"$1"') // {} | if type == "object" then . as $m | keys[] | . as $k | $m[.] | select('"$2"') | ["[", ($k|@sh) , "]=", (.|'"$_JQ_SHELLVALUE"')] | join("") else error("expected map for '"$value"'")  end'
+}
+
+
 #
 # extract a label mapping list from json
 # supporting different formats: lists, objects or single values
 # result:   sequence of "<label> <value>" pairs
+# result:   sequence of bash associative array litaral entries
 #
 _jq_get_labeled_value_list()
 {
-  jq -r '('$1' // empty) | if type == "object" then . as $m | keys[] | [.,$m[.]] elif type == "array" then .[] | if type == "object" then . as $m | keys[] | [.,$m[.]] else [.,.] end else . end | join("  ")'
+  jq -r '('$1' // []) | if type == "object" then . as $m | keys[] | [.,$m[.]] elif type == "array" then .[] | if type == "object" then . as $m | keys[] | [.,$m[.]] else [.,.] end else . end | ["[", (.[0]|@sh) , "]=", (.[1]|'"$_JQ_SHELLVALUE"')] | join("")'
 }
+
 
 #
 # extract a sequence of labeled arg lists from json
 # result: sequence of "<arg1>" .. "<argn>" tupels
 #
-_jq_get_labeled_arg_list()
-{
-  jq -r '('$1' // empty) | if type == "array" then .[] | if type == "object" then . as $m | keys[] | [ .,  ($m[.] | if type == "array" then .[] else . end)] else [.] end elif type == "object" then . as $m | keys[] | [ ., $m[.][]] else [.] end | @sh '
-}
+#_jq_get_labeled_arg_list()
+#{
+#  jq -r '('$1' // empty) | if type == "array" then .[] | if type == "object" then . as $m | keys[] | [ .,  ($m[.] | if type == "array" then .[] else . end)] else [.] end elif type == "object" then . as $m | keys[] | [ ., $m[.][]] else [.] end | @sh '
+#}
 
 #
 # extract a sequence of plugin specs
@@ -466,12 +560,6 @@ _jq_get_plugin_list_for_shell()
 }
 
 
-#
-# get a json field mapped to a string mapping
-_get_labeled_value_list()
-{
-  _read_hash $1 < <(_jq_get_labeled_value_list "$2")
-}
 
 __get() {
   if [ -n "$3" ]; then
@@ -506,6 +594,42 @@ _get_value_or_json() {
   eval $1="( $v )"
 }
 
+_get_json_map()
+{
+  __get _jq_get_json_map_for_shell "${@:2}"
+  eval $1="( $v )"
+}
+
+getJsonMap() {
+  local v
+  _get_json_map "$@"
+}
+
+_get_selected_json_map_entries()
+{
+  __get _jq_get_selected_json_map_entries_for_shell "$2" "$4" "$3" "${@:5}"
+  eval $1="( $v )"
+}
+
+getSelectedJsonMapEntries()
+{
+  local v
+  _get_selected_json_map_entries "$@"
+}
+
+#
+# get a json field mapped to a string mapping
+_get_labeled_value_list()
+{
+  __get _jq_get_labeled_value_list "${@:2}"
+  eval $1="( $v )"
+}
+
+getLabeledValueList()
+{
+  local v
+  _get_labeled_value_list "$@"
+}
 
 _get_config_value() {
   _get_value "$@" <<<"$CONFIGJSON"
@@ -648,21 +772,21 @@ getValueMap() {
 
 deljsonkey() {
     local v
-    v="$(eval echo \"\${"$1"}\" | jq 'del(.'$2')')"
-    eval $1=\'"$v"\'
+    v="$(echo "${!1}" | jq -r 'del(.'$2') | tojson |@sh')"
+    eval $1="$v"
 }
 
 setjsonvalue() {
     local value="$(echo "$3" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"
     local v
-    v="$(eval echo \"\${"$1"}\" | jq '.'$2'="'"$value"'"')"
-    eval $1=\'"$v"\'
+    v="$(echo "${!1}" | jq -r '.'$2'="'"$value"'" | tojson |@sh')"
+    eval $1="$v"
 }
 
 setjsonjson() {
     local v
-    v="$(eval echo \"\${"$1"}\" | jq -s '.[0].'""$2""'=.[1] | .[0]' - <( echo "$3"))"
-    eval $1=\'"$v"\'
+    v="$(echo "${!1}" | jq -sr '.[0].'"$2"'=.[1] | .[0] | tojson |@sh' - <( echo "${3}"))"
+    eval $1="$v"
 }
 
 getjsonvalue() {
@@ -702,9 +826,9 @@ jsonAdd()
 jsonAddString()
 {
   if [ $# -eq 3 ]; then
-    jsonAdd "$1" "$2" "\"$3\""
+    jsonAdd "$1" "${2//\"/\\\"}" "\"${3//\"/\\\"}\""
   else
-    jsonAdd "$1" "\"$2\""
+    jsonAdd "$1" "\"${2//\"/\\\"}\""
   fi
 }
 
@@ -713,13 +837,19 @@ jsonAddString()
 ################################################################################
 
 lookupFileIn() {
+  local all
   local opt="-f"
-  case "$1" in
-    -d) opt="-d"
-        shift;;
-    -x) opt="-x"
-        shift;;
-  esac
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      -d) opt="-d"
+          shift;;
+      -x) opt="-x"
+          shift;;
+      -a) all=x
+          shift;;
+      *)  break;;
+    esac
+  done
   local file="$1"
   shift
   if [[ "$file" = /* ]]; then
@@ -728,7 +858,9 @@ lookupFileIn() {
     for d in "$@"; do
       if [ $opt "$d/$file" ]; then
         echo "$d/$file"
-        return
+        if [ -z "$all" ]; then
+          return
+        fi
       fi
     done
   fi
@@ -765,6 +897,14 @@ lookupStub() {
   lookupFileIn "$1" "${dirs[@]}" "$CURRENT"  "$ROOT" "$SOW"
 }
 
+setStubs() {
+  local dirs=( )
+  productDirs dirs
+  while IFS= read -r line; do 
+    eval $1="( \"\$line\" \"\${$1[@]}\" )"
+  done <<<"$(lookupFileIn -a "$2" "${dirs[@]}" "$CURRENT" "$ROOT" "$SOW")"
+}
+
 ################################################################################
 # standard plugin utilities
 ################################################################################
@@ -779,8 +919,7 @@ PLUGIN_setup()
     SETTINGSJSON="$(cat "$DEPLOYMEMT")"
   fi
   if [ -z "$PLUGINCONFIG" ]; then
-    verbose "getting config from settings field $PLUGININSTANCE"
-    PLUGINCONFIGJSON="$(spiff merge --json --path "$PLUGININSTANCE" - <<< "$SETTINGSJSON")"
+    PLUGINCONFIGJSON="{}"
   else
     PLUGINCONFIGJSON="$(cat "$PLUGINCONFIG")"
   fi

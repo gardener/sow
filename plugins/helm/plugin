@@ -36,7 +36,7 @@ attempts=${retry_attempts:-5}
 backoff=${retry_wait:-15}
 
 if [ -z "$command" ]; then
-  command="${3:-"upgrade"}"
+  command="${2:-"upgrade"}"
 fi
 
 # Writes from stdin to file

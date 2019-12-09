@@ -14,6 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+setupPluginsFile()
+{
+  PLUGINSFILE="$STATE/$1/plugins.json"
+}
+
 ACTION_setup()
 {
   CURRENT="${COMPONENTS["$1"]}"
@@ -28,6 +33,24 @@ ACTION_setup()
   getComponentMetaProduct PRODUCT comp
   getMetaProductDir PRODUCTDIR "$PRODUCT"
 
+  DEPLOYEDVERSION=""
+  SPECVERSION=""
+  MIGRATE=""
+  if [ -n "${VERSIONS["$PRODUCT"]}" ]; then
+    SPECVERSION="${VERSIONS["$PRODUCT"]}"
+    if [ -f "$STATE/$COMPONENT/$fSPECVERSION" ]; then
+      DEPLOYEDVERSION="$(cat "$STATE/$COMPONENT/$fSPECVERSION")"
+    else
+      DEPLOYEDVERSION=0
+    fi
+    if [ $SPECVERSION -ne $DEPLOYEDVERSION ]; then
+      MIGRATE="true"
+    fi
+  fi
+  export SPECVERSION
+  export DEPLOYEDVERSION
+  export MIGRATE
+
   export CURRENT="$ROOT/$CURRENT"
   export PRODUCTDIR="$ROOT/$PRODUCTDIR"
   export PRODUCT
@@ -36,6 +59,7 @@ ACTION_setup()
   export GENDIR="$GEN/$COMPONENT"
   export STATEDIR="$STATE/$COMPONENT"
   export EXPORTDIR="$EXPORT/$COMPONENT"
+  setupPluginsFile "$1"
 }
 
 # $1; component
@@ -50,6 +74,11 @@ ___execute()
     ACTION_setup "$1"
     shift
     "$@"
+}
+
+synchronized()
+{
+  flock "$GENDIR/lock" "$@"
 }
 
 #
@@ -171,7 +200,7 @@ action_deployment()
   ######################
 
   local env=""
-  componentStub env
+  componentStub env "$action"
   echo "$env" >"$GENDIR/env.json"
 
   ############################
@@ -280,31 +309,51 @@ setState()
   errorHandler=( )
   if [ -n "$deployState" -a -d "$STATE/$COMPONENT" ]; then
     echo "$deployState" > "$STATE/$COMPONENT/state.info"
+    if [ "$deployState" == deployed -a -n "${VERSIONS["$PRODUCT"]}" ]; then
+      echo "${VERSIONS["$PRODUCT"]}" > "$STATE/$COMPONENT/$fSPECVERSION"
+    fi
   fi
 }
 
+
 # $1: name
-# $2: executable
-# $3: action
-# $4...: args
-_exec_plugin()
+# $2: instance
+# $3: executable/function
+# $4: action
+# $5...: args
+__exec_plugin()
 {
   if [ -z "$hide" ]; then
-    title "Plugin: $1[$3] ($2)"
+    if [ "$1" == "$2" ]; then
+      title "Plugin: $1[$4] ($3)"
+    else
+      title "Plugin: $1[$4]{$2} ($3)"
+    fi
   fi
   (
     if [ "${opts[plugin]}" = "${1}" ]; then
       export TRACE=X
-      "${@:2}"
+      "${@:3}"
     else
-      "${@:2}"
+      "${@:3}"
     fi
   )
 }
 
 # $1: action
 # $2: spec json
-# $3: variable holding config plugin is takem from (DEPLOYMENT or COMPONENT)
+# $3: variable holding config plugin is taken from (DEPLOYMENT or COMPONENT)
+BUILTIN_echo()
+{
+  local spec="$2"
+  local args=( )
+  getValueList args args spec
+  echo "${args[@]}"
+}
+
+# $1: action
+# $2: spec json
+# $3: variable holding config plugin is taken from (DEPLOYMENT or COMPONENT)
 BUILTIN_pinned()
 {
   local spec="$2"
@@ -402,18 +451,24 @@ cleanup_parallel()
 
 # $1: action
 # $2: spec json
-# $3: variable holding config plugin is takem from (DEPLOYMENT or COMPONENT)
+# $3: variable holding config plugin is taken from (DEPLOYMENT or COMPONENT)
 exec_plugin()
 {
   local action="$1"
   local spec="$2"
   local name
-  local dir
+  local key
+  local cpath
   local config
   local args=( )
+  local hide
 
   debug "executing plugin spec: $spec"
   getValue name name spec
+  if [[ "$name" = -* ]]; then
+    name="${name#-}" 
+    hide=x
+  fi
   if _is_function "BUILTIN_${name}"; then
     if [ -z "$hide" ]; then
       title "Plugin: $name[$action] (builtin)"
@@ -422,10 +477,36 @@ exec_plugin()
     return
   fi
 
-  getValue dir path spec
+  getValue key path spec
+  getValue cpath path spec
   getJSON config config spec
   getValueList args args spec
   
+  if [ -z "$key" ]; then
+    if [ ${#args[@]} -gt 0 ]; then
+      key="${args[0]}"
+      if [ -z "$key" ]; then
+        key="$name:"
+      fi
+      args=( "${args[@]:1}" )
+      if [ "${key#*:}" != "$key" ]; then
+         if [ -z "$cpath" -a -z "$config" ]; then
+           cpath="${key#*:}"
+         fi
+         key="${key%:*}"
+      else
+        if [ -z "$cpath" -a -z "$config" ]; then
+          cpath="$key"
+        fi
+      fi
+    else
+      key="$name"
+       if [ -z "$cpath" -a -z "$config" ]; then
+        cpath="$key"
+      fi
+    fi
+  fi
+
   if [ -n "${!3}" ]; then
     echo "${!3}" >"$GENDIR/deployment.json"
     export DEPLOYMEMT="$GENDIR/deployment.json"
@@ -433,35 +514,56 @@ exec_plugin()
     export DEPLOYMEMT=
   fi
 
+  if [ -z "${config}" -a -n "$cpath" ]; then
+    info "using config from path $cpath"
+    # use spiff to allow dedicated special characters in path like in dynaml
+    config="$(spiff merge --json --path "$cpath" - <<<"${!3}" || true)"
+    if [ -z "$config" ]; then
+      fail "configuration path '$cpath' not found for plugin $name{$key}"
+    fi
+  fi
   if [ -n "${config}" ]; then
-    export PLUGINCONFIG="$GENDIR/pluginconfig-$$.json"
+    export PLUGINCONFIG="$GENDIR/pluginconfig-${BASHPID}.json"
     echo "${config}" >"$PLUGINCONFIG"
   else
     export PLUGINCONFIG=
   fi
    
   local plugin_opts=( )
-  if [ -n "$dir" ]; then
-     PLUGININSTANCE="$dir"
-  else
-     PLUGININSTANCE=
-  fi
+  PLUGININSTANCE="$key"
   export PLUGININSTANCE
 
-  local hide=
   local s=0
   if [ -n "$name" ]; then
-    if [[ "$name" = -* ]]; then
-      name="${name#-}" 
-      hide=x
-    fi
     if _is_function "${name}"; then
-        _exec_plugin "${name}" "${name}" "${plugin_opts[@]}" "$action" "${args[@]}"
+        (
+        if [ -n "${config}" ]; then
+          PLUGINCONFIGJSON="${config}"
+        else
+          PLUGINCONFIGJSON="{}"
+        fi
+        __exec_plugin "${name}" "${key}" "${name}" "${plugin_opts[@]}" "$action" "${args[@]}"
+        )
     else
        local plugin
        plugin="$(lookupPlugin "${name}")"
        if [ -n "$plugin" ]; then
-          _exec_plugin "${name}" "$plugin" "${plugin_opts[@]}" "$action" "${args[@]}"
+          mkdir -p "$GENDIR/$PLUGININSTANCE"
+          setjsonvalue spec path "$cpath"
+          setjsonjson spec config "$config"
+          local ajson=""
+          for a in "${args[@]}"; do
+            jsonAddString ajson "$a"
+          done
+          setjsonjson spec args "[ $ajson ]"
+          if [ "$action" == deploy ]; then
+            synchronized "$SOW/bin/helper/pluginlist" $action "$key" "$spec"
+          fi
+
+          __exec_plugin "${name}" "${key}" "$plugin" "${plugin_opts[@]}" "$action" "${args[@]}"
+          if [ "$action" == delete ]; then
+            synchronized "$SOW/bin/helper/pluginlist" $action "$key" "$spec"
+          fi
        else
          fail "no action function or plugin with name '${name}' found"
        fi
@@ -474,6 +576,54 @@ exec_plugin()
   fi
 }
 
+# execute external plugin by its spec object
+# $1: action
+# $2: instance
+# $3: spec json
+_exec_plugin()
+{
+  local action="$1"
+  local key="$2"
+  local spec="$3"
+  local name
+  local cpath
+  local config
+  local args=( )
+
+  debug "executing plugin spec: $spec"
+  getValue name name spec
+  getValue cpath path spec
+  getJSON config config spec
+  getValueList args args spec
+  
+  export DEPLOYMEMT=
+
+  export PLUGINCONFIG="$GENDIR/pluginconfig-${BASHPID}.json"
+  echo "${config}" >"$PLUGINCONFIG"
+   
+  PLUGININSTANCE="$key"
+  export PLUGININSTANCE
+
+  local hide=
+  local s=0
+  if [ -n "$name" ]; then
+    if [[ "$name" = -* ]]; then
+      name="${name#-}" 
+      hide=x
+    fi
+     local plugin
+     plugin="$(lookupPlugin "${name}")"
+     if [ -n "$plugin" ]; then
+        mkdir -p "$GENDIR/$PLUGININSTANCE"
+        __exec_plugin "${name}" "${key}" "$plugin" "${plugin_opts[@]}" "$action" "${args[@]}"
+     else
+       fail "no action function or plugin with name '${name}' found"
+     fi
+  fi
+
+  rm -f "$GENDIR/deployment.json"
+  rm -f "$PLUGINCONFIG"
+}
 
 # $1: action
 # $2: field path
@@ -498,10 +648,40 @@ exec_configured_plugins() {
   if [ "$action" == "delete" ]; then
     order="| reverse"
   fi
+  if [ "$action" == deploy -o "$action" == delete ]; then
+    "$SOW/bin/helper/pluginlist" reset
+  fi
   local msg="executing configured plugins for action $action"
   _exec_plugin_list "$action" "$2" "$3" "$3" "$order"
   if [ -n "$msg" ]; then
     info "no plugins found for action $action"
+  fi
+
+  #
+  # cleanup deleted external plugin plugins
+  if [ "$action" == deploy -o "$action" == delete ]; then
+    if [ -f "$PLUGINSFILE" ]; then
+      LIST="$(cat "$PLUGINSFILE")"
+      local curlist=( )
+      local lastlist=( )
+      getValueList curlist current LIST
+      getValueList lastlist last LIST
+      for i in "${lastlist[@]}"; do
+        if ! contains "$i" "${curlist[@]}"; then
+          local spec
+          local name
+          local keep
+          getJSON spec "plugins.\"$i\"" LIST
+          if [ -n "$spec" ]; then
+            getValue name name spec
+            info "found deleted plugin $name{$i}"
+            _exec_plugin delete "$i" "$spec"
+          fi
+          "$SOW/bin/helper/pluginlist" del "$i"
+        fi
+      done
+      "$SOW/bin/helper/pluginlist" update
+    fi
   fi
 }
 
