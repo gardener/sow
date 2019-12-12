@@ -18,19 +18,22 @@ RUN apk update && apk add --no-cache bash curl libc6-compat findutils apache2-ut
 RUN apk add git=2.20.1-r0
 RUN apk add terraform=0.11.8-r0
 RUN apk add jq=1.6-r0
-RUN curl -L -o /usr/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/v1.15.5/bin/linux/amd64/kubectl
-RUN curl -L -o /usr/bin/kustomize https://github.com/kubernetes-sigs/kustomize/releases/download/v3.1.0/kustomize_3.1.0_linux_amd64
-RUN curl -L -o helm-archive.tar.gz https://storage.googleapis.com/kubernetes-helm/helm-v2.15.1-linux-amd64.tar.gz \
+RUN curl -L -o /usr/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/v1.15.5/bin/linux/amd64/kubectl \
+    && chmod +x /usr/bin/kubectl
+RUN curl -L -o /usr/bin/kustomize https://github.com/kubernetes-sigs/kustomize/releases/download/v3.1.0/kustomize_3.1.0_linux_amd64 \
+    && chmod +x /usr/bin/kustomize
+RUN curl -L -o helm-archive.tar.gz https://get.helm.sh/helm-v3.0.1-linux-amd64.tar.gz \
     && mkdir helm-extract \
     && tar -xzf helm-archive.tar.gz -C helm-extract \
     && cp helm-extract/linux-amd64/helm /usr/bin/helm \
-    && rm -rf helm-archive.tar.gz helm-extract
+    && rm -rf helm-archive.tar.gz helm-extract \
+    && chmod +x /usr/bin/helm
 RUN curl -L -o spiff-archive.zip https://github.com/mandelsoft/spiff/releases/download/v1.4.0-beta-2/spiff_linux_amd64.zip \
     && mkdir spiff-extract \
     && unzip -d spiff-extract spiff-archive.zip \
     && cp "spiff-extract/spiff++" /usr/bin/spiff \
-    && rm -rf spiff-archive.zip spiff-extract
+    && rm -rf spiff-archive.zip spiff-extract \
+    && chmod +x /usr/bin/spiff
 COPY . /sow
-RUN chmod +x /usr/bin/*
 ENV PATH=$PATH:/sow/bin
 ENTRYPOINT ["sow"]
