@@ -30,12 +30,21 @@ fi
 
 deploy() {
     info "Running kustomize build $fullpath ..."
-    exec_cmd kustomize build "$fullpath" $(echo "${kustomize_flags_deploy[@]}") > "$dir/manifest.yaml"
+    exec_cmd_override "kustomize build \"$fullpath\" $(echo "${kustomize_flags_deploy[@]}")"
 }
 
 delete() {
     info "Running kustomize build $fullpath ..."
-    exec_cmd kustomize build "$fullpath" $(echo "${kustomize_flags_deploy[@]}") > "$dir/manifest.yaml"
+    exec_cmd_override "kustomize build \"$fullpath\" $(echo "${kustomize_flags_delete[@]}")"
+}
+
+# workaround - exec_cmd can't be used since it uses 'echo' (in verbose mode), which interferes with the pipe.
+exec_cmd_override() {
+    local cmd="$1"
+    if [ -n "$VERBOSE" ]; then
+        echo "$cmd"
+    fi
+    eval $(echo "$cmd") > "$dir/manifest.yaml"
 }
 
 case "$1" in
