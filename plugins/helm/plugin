@@ -59,6 +59,10 @@ fi
 deploy() {
     info "Running helm $command for $name ..."
     case "$command" in
+        spiff)
+            verbose "Using 'spiff merge' on values file ..."
+            sed -e 's/((! /(( /' <<< "$PLUGINCONFIGJSON" | spiff merge --path=.values --json - > "$dir/values.json"
+            ;&
         upgrade)
             while true; do
                 if exec_cmd helm upgrade --install --force --wait $name --kubeconfig "$KUBECONFIG" --values "$dir/values.json" --namespace $namespace $(echo "${helm_flags_deploy[@]}") "$src" ; then
@@ -85,19 +89,23 @@ deploy() {
 
 delete() {
     case "$command" in
+        spiff)
+            verbose "Skipping spiff merge of values file, as it is not needed during delete"
+            ;&
         upgrade)
             info "Deleting helm deployment for $name"
             tmp="/tmp/helmplugin$$"
             while true; do
-                if exec_cmd helm delete --kubeconfig "$KUBECONFIG" --purge $name $(echo "${helm_flags_delete[@]}") 2>"$tmp" ; then
+                if exec_cmd helm uninstall --kubeconfig "$KUBECONFIG" --namespace $namespace $name $(echo "${helm_flags_delete[@]}") 2>"$tmp" ; then
                     break
                 else
                     error="$(cat "$tmp")"
                     attempts=$(( attempts - 1 ))
-                    if [ "$error" = "Error: release: \"$name\" not found" ]; then
+                    if [ "$error" = "Error: uninstall: Release not loaded: $name: release: not found" ]; then
                         info "release $name already deleted"
                         break
                     elif [[ $attempts -gt 0 ]]; then
+                        echo "$error"
                         info "command failed, waiting for $backoff seconds and trying again ($attempts times)"
                         sleep $backoff
                     else
@@ -117,7 +125,7 @@ delete() {
 }
 
 helm_template() {
-    local cmd="helm template --name $name --kubeconfig \"$KUBECONFIG\" --values \"$dir/values.json\" --namespace $namespace $(echo "${helm_flags_deploy[@]}") \"$src\""
+    local cmd="helm template $name --kubeconfig \"$KUBECONFIG\" --values \"$dir/values.json\" --namespace $namespace $(echo "${helm_flags_deploy[@]}") \"$src\""
     if [ -n "$VERBOSE" ]; then
         # workaround - exec_cmd can't be used since it uses 'echo' (in verbose mode), which interferes with the pipe.
         echo "$cmd"
