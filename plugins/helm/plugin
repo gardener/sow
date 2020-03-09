@@ -56,13 +56,16 @@ if [ -z "$src" ]; then
     fi
 fi
 
+# handle spiff templating of values file if necessary
+if [[ "$command" == "spiff" ]]; then
+    verbose "Using 'spiff merge' on values file ..."
+    sed -e 's/((! /(( /' <<< "$PLUGINCONFIGJSON" | spiff merge --path=.values --json - > "$dir/values.json"
+    command="${3:-"upgrade"}"
+fi
+
 deploy() {
     info "Running helm $command for $name ..."
     case "$command" in
-        spiff)
-            verbose "Using 'spiff merge' on values file ..."
-            sed -e 's/((! /(( /' <<< "$PLUGINCONFIGJSON" | spiff merge --path=.values --json - > "$dir/values.json"
-            ;&
         upgrade)
             while true; do
                 if exec_cmd helm upgrade --install --force --wait $name --kubeconfig "$KUBECONFIG" --values "$dir/values.json" --namespace $namespace $(echo "${helm_flags_deploy[@]}") "$src" ; then
@@ -89,9 +92,6 @@ deploy() {
 
 delete() {
     case "$command" in
-        spiff)
-            verbose "Skipping spiff merge of values file, as it is not needed during delete"
-            ;&
         upgrade)
             info "Deleting helm deployment for $name"
             tmp="/tmp/helmplugin$$"
