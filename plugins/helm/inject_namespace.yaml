@@ -1,0 +1,8 @@
+temp:
+  <<: (( &temporary ))
+  inject_ns: (( |obj,ns|-> defined(obj.metadata.namespace) ? obj :sum[obj|{}|s,k,v|-> s ( k == "metadata" ? { k = v {"namespace" = ns} } :{ k = v } )] ))
+  files: (( read(path, "multiyaml") ))
+  namespace: (( env( "NAMESPACE" ) ))
+  path: (( env( "TEMPLATE_FILE" ) ))
+
+result: (( map[select[temp.files|elem|-> valid(elem)]|f|-> temp.inject_ns(f, temp.namespace)] ))
