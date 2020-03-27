@@ -130,6 +130,11 @@ helm_template() {
         # workaround - exec_cmd can't be used since it uses 'echo' (in verbose mode), which interferes with the pipe.
         echo "$cmd"
     fi
+    eval $(echo "$cmd") | dump "$dir/rendered_charts_raw.yaml"
+    cmd="TEMPLATE_FILE=\"$dir/rendered_charts_raw.yaml\" NAMESPACE=$namespace spiff merge \"$PLUGIN/inject_namespace.yaml\" --path result --split"
+    if [ -n "$VERBOSE" ]; then
+        echo "$cmd"
+    fi
     eval $(echo "$cmd") | dump "$dir/rendered_charts.yaml"
 }
 
