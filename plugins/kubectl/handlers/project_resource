@@ -12,11 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-action_delete_Project_garden_sapcloud_io() {
-    exec_cmd kubectl --kubeconfig "$3" annotate project "$1" confirmation.garden.sapcloud.io/deletion=true --overwrite
-    exec_cmd kubectl --kubeconfig "$3" delete project "$1"
-}
-
 action_delete_Project_core_gardener_cloud() {
-    action_delete_Project_garden_sapcloud_io "$@"
+    exec_cmd kubectl --kubeconfig "$3" annotate project "$1" confirmation.gardener.cloud/deletion=true --overwrite
+    exec_cmd kubectl --kubeconfig "$3" delete project "$1"
 }

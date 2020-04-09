@@ -12,16 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-action_delete_Seed_garden_sapcloud_io() {
-    seeds_in_use=($(kubectl --kubeconfig "$3" get shoots --all-namespaces -o jsonpath='{.items.*.spec.cloud.seed}'))
+action_delete_Seed_core_gardener_cloud() {
+    verbose "Check if shoots are still running on seed '$1' ..."
+    seeds_in_use=($(kubectl --kubeconfig "$3" get shoots --all-namespaces -o jsonpath='{.items.*.spec.seedName}'))
     for seed in ${seeds_in_use[@]}; do
         if [[ "$seed" == "$1" ]]; then
             fail "there are still shoots running on seed '$seed'"
         fi
     done
     exec_cmd kubectl --kubeconfig "$3" delete seed "$1"
-}
-
-action_delete_Seed_core_gardener_cloud() {
-    action_delete_Seed_garden_sapcloud_io "$@"
 }
