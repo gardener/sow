@@ -28,7 +28,7 @@ RUN curl -L -o helm-archive.tar.gz https://get.helm.sh/helm-v3.0.1-linux-amd64.t
     && cp helm-extract/linux-amd64/helm /usr/bin/helm \
     && rm -rf helm-archive.tar.gz helm-extract \
     && chmod +x /usr/bin/helm
-RUN curl -L -o spiff-archive.zip https://github.com/mandelsoft/spiff/releases/download/v1.4.0-beta-2/spiff_linux_amd64.zip \
+RUN curl -L -o spiff-archive.zip https://github.com/mandelsoft/spiff/releases/download/v1.4.0/spiff_linux_amd64.zip \
     && mkdir spiff-extract \
     && unzip -d spiff-extract spiff-archive.zip \
     && cp "spiff-extract/spiff++" /usr/bin/spiff \
