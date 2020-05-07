@@ -18,7 +18,7 @@ set -e
 
 source "$SOWLIB/pluginutils"
 
-jq .values <<< "$PLUGINCONFIGJSON" > "$dir/terraform.tfvars"
+jq .values <<< "$PLUGINCONFIGJSON" > "$dir/terraform.tfvars.json"
 
 getRequiredValue source source PLUGINCONFIGJSON
 
@@ -26,7 +26,7 @@ deploy() {
     (
         cd "$dir"
         exec_cmd terraform init "$source"
-        exec_cmd terraform apply -auto-approve -var-file="$dir/terraform.tfvars" -state="$state/terraform.tfstate" "$source"
+        exec_cmd terraform apply -auto-approve -var-file="$dir/terraform.tfvars.json" -state="$state/terraform.tfstate" "$source"
     )
 }
 
@@ -35,7 +35,7 @@ delete() {
         (
             cd "$dir"
             exec_cmd terraform init "$source"
-            exec_cmd terraform destroy -force -var-file="$dir/terraform.tfvars" -state="$state/terraform.tfstate" "$source"
+            exec_cmd terraform destroy -force -var-file="$dir/terraform.tfvars.json" -state="$state/terraform.tfstate" "$source"
         )
     fi
 }

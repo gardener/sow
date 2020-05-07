@@ -71,19 +71,19 @@ checkout() {
         mkdir -p "$repo_path"
         (
             cd "$repo_path"
-            git init
-            git remote add origin "$repo"
+            exec_cmd git init
+            exec_cmd git remote add origin "$repo"
         )
     fi
     (
         cd "$repo_path"
         git init # workaround for strange "fatal: not a git repository" error
         if [ $mode = "commit" ]; then
-            git fetch -f -n origin
-            git checkout $ref "${files[@]}"
+            exec_cmd git fetch -f -n origin
+            exec_cmd git checkout $ref "${files[@]}"
         else
-            git fetch --depth 1 -f origin $prefix$ref
-            git checkout FETCH_HEAD "${files[@]}"
+            exec_cmd git fetch --depth 1 -f origin $prefix$ref
+            exec_cmd git checkout FETCH_HEAD "${files[@]}"
         fi
     )
 
