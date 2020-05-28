@@ -30,9 +30,11 @@ action_deploy_CustomResourceDefinition_apiextensions_k8s_io()
 action_delete_CustomResourceDefinition_apiextensions_k8s_io() {
     objs="$(kubectl --kubeconfig "$3" get --all-namespaces "$1" -o json | jq ".items | length")"
     if [ $objs -eq 0 ]; then
-      if [[ $(kubectl --kubeconfig "$3" get crd "$1" -o json | jq -r '.metadata.labels["gardener.cloud/deletion-protected"]') == "true" ]]; then
-        verbose "Annotate crd to enable deletion ..."
-        exec_cmd kubectl --kubeconfig "$3" annotate crd "$1" "confirmation.gardener.cloud/deletion=true"
+      if [[ ${1: -15} == ".gardener.cloud" ]]; then
+        if [[ $(kubectl --kubeconfig "$3" get crd "$1" -o json | jq -r '.metadata.labels["gardener.cloud/deletion-protected"]') == "true" ]]; then
+          verbose "Annotate crd to enable deletion ..."
+          exec_cmd kubectl --kubeconfig "$3" annotate crd "$1" "confirmation.gardener.cloud/deletion=true"
+        fi
       fi
       exec_cmd kubectl --kubeconfig "$3" delete crd "$1" --wait=false
     else
