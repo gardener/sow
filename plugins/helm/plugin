@@ -59,7 +59,7 @@ fi
 # handle spiff templating of values file if necessary
 if [[ "$command" == "spiff" ]]; then
     verbose "Using 'spiff merge' on values file ..."
-    sed -e 's/((! /(( /' <<< "$PLUGINCONFIGJSON" | spiff merge --path=.values --json - > "$dir/values.json"
+    sed -E 's/\(\(!+ /\(\( /' <<< "$PLUGINCONFIGJSON" | spiff merge --path=.values --json - > "$dir/values.json"
     command="${3:-"upgrade"}"
 fi
 
