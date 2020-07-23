@@ -18,7 +18,7 @@ RUN apk update && apk add --no-cache bash curl libc6-compat findutils apache2-ut
 RUN apk add git~=2.24
 RUN apk add terraform~=0.12
 RUN apk add jq~=1.6
-RUN curl -L -o /usr/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/v1.17.5/bin/linux/amd64/kubectl \
+RUN curl -L -o /usr/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/v1.17.9/bin/linux/amd64/kubectl \
     && chmod +x /usr/bin/kubectl
 RUN curl -L -o kustomize-archive.tar.gz https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv3.5.4/kustomize_v3.5.4_linux_amd64.tar.gz \
     && mkdir kustomize-extract \
