@@ -26,7 +26,7 @@ RUN curl -L -o kustomize-archive.tar.gz https://github.com/kubernetes-sigs/kusto
     && cp kustomize-extract/kustomize /usr/bin/kustomize \
     && rm -rf kustomize-archive.tar.gz kustomize-extract \
     && chmod +x /usr/bin/kustomize
-RUN curl -L -o helm-archive.tar.gz https://get.helm.sh/helm-v3.2.0-linux-amd64.tar.gz \
+RUN curl -L -o helm-archive.tar.gz https://get.helm.sh/helm-v3.2.4-linux-amd64.tar.gz \
     && mkdir helm-extract \
     && tar -xzf helm-archive.tar.gz -C helm-extract \
     && cp helm-extract/linux-amd64/helm /usr/bin/helm \
