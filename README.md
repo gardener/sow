@@ -289,7 +289,7 @@ the component folder. The deployment template also declares state fields
 next processing. It is automatically added to the stub list as top-level stub.
 If a manual merge should be done with the latest state such a node
 has to disable the auto.merge, also, by adding a `merge none` expression.
-(See state support of [spiff++](https://github.com/mandelsoft/spiff/README.md(#-state-)
+(See state support of [spiff++](https://github.com/mandelsoft/spiff#-state-))
 
 The generated effective deployment manifest should contain a `plugins` node
 listing the plugins that should be executed.  A plugin entry may take
