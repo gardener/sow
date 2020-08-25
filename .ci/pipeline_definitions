@@ -2,6 +2,7 @@ sow-release:
   template: 'default'
   base_definition:
     traits:
+      component_descriptor: ~
       version:
         preprocess: 'finalize'
         inject_effective_version: true
