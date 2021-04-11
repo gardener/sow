@@ -134,7 +134,7 @@ esac
 componentStub()
 {
   local __stub
-  jsonAddString __stub "<<" "(( &temporary ))"
+  jsonAddString __stub "<<" "(( &temporary &inject ))"
   jsonAddString __stub ROOTDIR "$ROOT"
   jsonAddString __stub ROOTPRODUCTDIR "$ROOTPRODUCTDIR"
   jsonAddString __stub PRODUCT "$PRODUCT"

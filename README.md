@@ -524,8 +524,18 @@ shell scripts.
 There is a combined environment and command line interface for the execution
 of plugins.
 
+The first argument is always the action to perform:
+ 
+ `prepare`: for plugins in component.yaml
+ `deploy`: execute a deployment
+ `delete`: delete the former deployment
+ `cleanup`: for plugin in component.yaml
+
+There might be additional arguments accordin the plugin spec in the deployment.yaml.
+
 In the environment environment variables are provided for a dedicated execution:
 
+- `CURRENT`: The path to the component folder (also the actual working directory)
 - `DEPLOYMEMT`: The manifest file the plugin execution is taken from
 - `PLUGINCONFIG`: A file containing the configuration configured in the plugin
                   specification in the above manifest

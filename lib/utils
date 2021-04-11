@@ -93,6 +93,12 @@ handle_error()
     fi
     $h
   done
+
+  if [ -z "$INTENDED_EXIT" ]; then
+    if [ -n "$PLUGINCONFIG" -a -f "$PLUGINCONFIG" ]; then
+      rm -f "$PLUGINCONFIG"
+    fi
+  fi
 }
 
 addCleanupHandler()
@@ -401,6 +407,64 @@ executionLoop()
     fi
     "$1" "$cmd" $_i "${_values[$_i]}" "${@:2}"
   done
+}
+
+isAbsolutePath()
+{
+  test "${1#/}" != "$1"
+}
+
+################
+# get absolute path for a path
+#
+# $1 : relative filename (at least directory must exist)
+################
+abspath()
+{
+  if [ -d "$1" ]; then
+    ( cd "$1"; pwd )
+  else
+    local p="${1%%/}"
+    local t
+    while t="${p%%/.}"; [ "$p" != "$t" ]; do
+      p="${t%%/}"
+    done
+    p="$(cd "$(dirname "$p")" && pwd)/$(basename "$p")"
+    t="${p%%/..}"
+    [ "$t" == "$p" ] && echo "$p" || dirname "$t"
+  fi
+}
+
+################
+# get relative path
+# 
+# $1: base path   (from)
+# $2: target path (to)
+################
+relpath()
+{
+  [ $# -ge 1 -a $# -le 2 ] || Error two paths required
+  local current="${2:+"$1"}"
+  local target="${2:-"$1"}"
+  [ "$target" != . ] || target=/
+  target="/${target##/}"
+  [ "$current" != . ] || current=/
+  current="${current:="/"}"
+  current="/${current##/}"
+  local appendix="${target##/}"
+  local relative=''
+  while appendix="${target#"$current"/}"
+      [ "$current" != '/' ] && [ "$appendix" = "$target" ]; do
+      if [ "$current" = "$appendix" ]; then
+          relative="${relative:-.}"
+          echo "${relative#/}"
+          return 0
+      fi
+      current="${current%/*}"
+      relative="$relative${relative:+/}.."
+  done
+  relative="$relative${relative:+${appendix:+/}}${appendix#/}"
+  echo "$relative"
 }
 
 ############################################################################
