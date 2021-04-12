@@ -134,6 +134,18 @@ a kubernetes cluster.
 │   │   .       └── export.yaml
 │   │   .
 │   │
+│   ├── templates             # templates of the root installation source
+│   │   ├── templ1
+│   │   │   ├── template.yaml
+│   │   │   ├── deployment.yaml
+│   │   │   └── export.yaml
+│   │   ├── nested            # templates may be nested
+│   │   │   └── templ2
+│   │   │       ├── template.yaml
+│   │   │       ├── deployment.yaml
+│   │   .       └── export.yaml
+│   │   .
+│   │
 │   ├── lib                   # convention: folder for any kind of libraries
 │   │   ├── sow.sh            # optional sow extension script
 │   │   .
@@ -182,7 +194,28 @@ a kubernetes cluster.
 
 ## The control files
 
-### `acre.yaml`
+### Landscape
+
+The landscape describes all the installation sources and configurations
+to setup a dedicated landscape instance. Therefore it contains a
+landscape configuration file (`acre.yaml`) and the installation components
+as root installation source located below the `crop` folder.
+
+The root installation source may again contain more installation sources
+below the `greenhouses`folder. But the main purpose is to describe
+[installation components](#components). They describe
+dedicated orchestrated installation objects, and a defined information
+flow among those components given by imports and exports. Based on those
+usage relationships an installation order is determined for the
+execution of the component deployment and deletion.
+
+To share behaviour of similar components (for example an etcd cluster)
+the installation description can be separated into [templates](#templates).
+The component then just refers to a template and provides dedicated config
+values for a dedicated template instance. The templates acts as a blueprint
+for an installation description shared by all using components.
+
+#### `acre.yaml`
 
 This file may contain any configuration information in any 
 structure required by the installation source.
@@ -196,7 +229,7 @@ kinds of information for the yaml interpolation steps.
 
 This document is processed by spiff using an optional `acre.yaml` located
 in the root installation source as template.
-Tis template can be used to provide defaults or to check required values
+This template can be used to provide defaults or to check required values
 in the configuration (using _spiff_ features).
 
 The processing result is stored in `gen/config.json`. This file
@@ -215,7 +248,21 @@ If configured, the referenced script will be called once before any call to `sow
 
 Whatever you provide in the (optional) `config` node will be given to the script as a second argument in form of a JSON string.
 
-### `component.yaml`
+### Components
+
+Components provide the isntallation and deinstallation procedures
+by [declaring and configuring](#deploymentyaml) a set of
+[plugin](#plugins) instances.
+The calculation of the plugin configurations can be based on
+input values provided by exports of other (used) components.
+Therefore every component may declare labeled [imports](#componentyaml)
+(references to other components in the same greenhouse or nested ones) and
+describe [exports](#exportyaml) based on the own executed or configured
+deployment provided to be used by other components (for example
+outputs provided by a terraform project executed by the terraform
+plugin).
+
+#### `component.yaml`
 
 This file indicates the root folder of a component. It is used by
 _sow_ to extract control information for the component held in
@@ -249,10 +296,14 @@ So far, three fields are used:
   called before deployment evaluation (action `prepare`) and after deletion
   steps (action `cleanup`).
 
+- `template`: a template (see [Templates](#templates)) to use.
+   The template may add stubs and define a `deployment.yaml` and/or an
+   `export.yaml` that is added to appropriate processing step
+
 This file is processed by _spiff_ using the landscape configuration
 and the tool's `component.yaml` template file as stub.
 
-### `deployment.yaml`
+#### `deployment.yaml`
 
 This document is used to describe the used deployment plugins for a component and
 their configuration settings.
@@ -277,6 +328,7 @@ actual component environment:
 - `PRODUCTDIR`: the root directory of the component's product
 - `SPECVERSION`: the specification version of the component's product
 - `DEPLOYEDVERSION`: the actually deployed specification version of the component's product
+- `TEMPLATES`: a list of template directories (see [Templates](#templates))
 - `MIGRATION`: a boolean indicating that migration steps should be executed (see [Migrations](#Migrations))
 
 _sow_ evaluates the dependencies and generates an additional stub file
@@ -346,7 +398,7 @@ If the plugin name start with a `-`, its execution is not notified
 on the output. This can be used for the `echo` plugin to
 echo plain multi line text.
 
-#### Execution order
+##### Execution order
 
 The execution order is taken from the list order and reversed for the deletion
 of a component.
@@ -372,7 +424,7 @@ a list of plugins with a defined execution order.
 If the list of external plugin instance is changed, the vanished instances
 will automatically be deleted after the deployment.
 
-#### Built-in Plugins
+##### Built-in Plugins
 
 There is an internal interface for built-in plugin. The `pinned` plugin is an
 example for such a plugin. Built-in plugins could be loaded by the command
@@ -399,11 +451,20 @@ plugins.
 
 There are some predefined built-in plugins:
 
-- `pinned`: execute list of plugins always in the given order (for creation and deletion)
-- `unpinned`: execute the plugins in the reversed order for deletion
-- `parallel`: execute plugins in parallel
+- General Plugins
+ - `echo`: echo all arguments 
+ - `fail`: echo all arguments as failure message and abort with error
+- Plugin for controlling plugin execution of nested plugin definitions.
+ - `pinned`: execute list of plugins always in the given order (for creation and deletion)
+ - `unpinned`: execute the plugins in the reversed order for deletion
+ - `parallel`: execute plugins in parallel
 
-#### Action Script
+Please note, that there is no need for loops or conditions here,
+because the plugin list can be dynamicall generated as part of the
+deployment.yaml, which is processed via *spiff*. This processing supports all kinds of 
+control structures to describe dynamic content.
+
+##### Action Script
 
 A component may contain an `action` script below its root folder.
 This script file is `sourced` by a bash executing an action. It
@@ -411,7 +472,7 @@ may define builtin plugins (using the internal builtin interface) or regular
 plugins just as shell function. Any shell function defined here
 can be called as regular plugin just by its name for the descriptor files.
 
-### `export.yaml`
+#### `export.yaml`
 
 This file should describe the information intended for reuse by other
 components. By convention it should be stored below an `export` node.
@@ -424,6 +485,84 @@ state file is omitted.
 If it contains a `files` section the listes files (structure with `path` and
 `data` fields) are written to the components export folder. Optionally the
 file mode is specified with `mode`.
+
+### Templates
+
+A template describes a dedicated parameterized deployment behaviour.
+It features the same deployment and export files like [components](#components), but
+templates do not have dependencies and are not executed. Instead components may
+refer to a template and provide configuration information based on the imports
+of the component and component (instance) specific values.
+
+This is done by the component's `deployment.yaml` and `export.yaml` files used as
+direct stubs for the corresponding files provided by the template.
+
+The template files should use a dedicated parameterization interface
+(for example a dedicated node in the yaml file (i.e. `contract` or `template`)),
+whose default values can be overwritten by the component's version
+of the file.
+
+For example a template providing a
+
+**deployment.yaml**
+```yaml
+template:
+  message: default message
+
+plugins:
+  - echo: (( template.message ))
+```
+
+and in a component's `deployment.yaml`:
+```yaml
+template:
+  message: component message
+```
+
+Additionally the template may provide files or directories used in
+the generated plugin configuration. To enable overriding those files
+in components (or higher level templates) the `env` object provides
+two lookup functions to access files or directories along the template
+chain:
+
+- `env.lookupfile(<relpath>)`: lookup a file starting with the component.
+- `env.lookupdir(<relpath>)`: lookup a directory starting with the component.
+
+(The component folder will always be the first lookup location and the
+base template the last). This is based on a dedicated env property
+`env.TEMPLATES`, which describes the locations of the actual template chain.
+
+The lookup order allows overriding a file or directory by components or
+templates using a template.
+
+A template is described by a `template.yaml` file located in
+folders below the `templates` folder in a greenhouse.
+
+#### `template.yaml`
+
+This file indicates the root folder of a component template. It is used by
+_sow_ to extract control information for the template held in
+the node `template`.
+
+By declaring the usage of a template a component inherits information
+from the template.  Templates may be cascaded by specifying a template for
+a template using the `template` attribute.
+
+It may define stubs (see [component.yaml](#componentyaml)), but no imports.
+Additionally a template may contain a [deployment.yaml](#deploymentyaml) and
+an [export.yaml](#exportyaml). 
+
+The basic template version is always used as template for the final processing
+under the control of a using component.
+
+Additional versions, from the component or higher level templates are used as
+direct stubs in the opposite reference order to feed information into the lower
+level versions.
+
+For example: if a `component1` uses `template1` which again is based on the final
+`template2`, then the files in `template2` will be the processing template
+(unsing *spiff*) followed by the versions from `template1` and `component1`.
+
 
 ### The Generation Process
 
@@ -454,6 +593,8 @@ Every component is processed separately.
   `gen` folder of the component and the actual (maybe updated)
   state (4a) replacing the old state held in the state folder. Therefore the
   state support of `spiff++` is used.
+  When using templates the template's version of the file is put in front of
+  the processing chain.
 5. the effective deploment configuration is evaluated and the plugin
   set and order is determined. Then the plugins are called in the
   appropriate order together with their dedicated configuration settings.
@@ -463,6 +604,8 @@ Every component is processed separately.
   manifest and all other stubs (except the state.yaml) to generate the
   contract information for using components. The effective `state.yaml` is
   stored in the `export` folder of the component.
+  When using templates the template's version of the file is put in front of
+  the processing chain.
 
 ## The command
 

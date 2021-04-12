@@ -200,7 +200,7 @@ action_deployment()
   ######################
 
   local env=""
-  componentStub env "$action"
+  componentStub env "$action" "$templ"
   echo "$env" >"$GENDIR/env.json"
 
   ############################
@@ -338,6 +338,17 @@ __exec_plugin()
       "${@:3}"
     fi
   )
+}
+
+# $1: action
+# $2: spec json
+# $3: variable holding config plugin is taken from (DEPLOYMENT or COMPONENT)
+BUILTIN_fail()
+{
+  local spec="$2"
+  local args=( )
+  getValueList args args spec
+  fail "${args[@]}"
 }
 
 # $1: action

@@ -143,6 +143,18 @@ componentStub()
   jsonAddString __stub GENDIR "$GENDIR"
   jsonAddString __stub STATEDIR "$STATEDIR"
   jsonAddString __stub EXPORTDIR "$EXPORTDIR"
+
+  jsonAddString __stub lookupfile "(( |f|->lookup_file(f,__ctx.DIR, reverse(_.TEMPLATES) || [])[0] ))"
+  jsonAddString __stub lookupdir "(( |f|->lookup_dir(f,__ctx.DIR, reverse(_.TEMPLATES) || [])[0] ))"
+  if [ -n "$3" ]; then
+    local __tlist
+    local dlist
+    addTemplateDirs "$3"
+     for d in "${dlist[@]}"; do
+       jsonAddString __tlist "$d"
+     done
+    jsonAdd __stub TEMPLATES "[ ${__tlist} ]"
+  fi
   local curvers="${VERSIONS["$PRODUCT"]}"
   if [ -n "$curvers" ]; then
     jsonAdd __stub SPECVERSION "$curvers"
@@ -543,6 +555,19 @@ walkTemplates()
       walkTemplates "$templ" "${@:2}"
     fi
   fi
+}
+
+#
+# dlist     array
+#
+addTemplateDirs()
+{
+  walkTemplates "$1" _addTemplateDirs
+}
+
+_addTemplateDirs()
+{
+  dlist=( "$ROOT/$dir" "${dlist[@]}" )
 }
 
 #
