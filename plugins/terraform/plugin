@@ -20,9 +20,43 @@ source "$SOWLIB/pluginutils"
 
 jq .values <<< "$PLUGINCONFIGJSON" > "$dir/terraform.tfvars.json"
 
-getRequiredValue source source PLUGINCONFIGJSON
+getValue source source PLUGINCONFIGJSON
+getJSON main main PLUGINCONFIGJSON
+
+src="$CURRENT/$PLUGININSTANCE"
+
+if [ -z "$source" -a -z "$main" ]; then
+  source="$PLUGININSTANCE"
+fi
+if [ -n "$main" ]; then
+  if [ -n "$source" ]; then
+    fail "either a source folder (source) or a direct content (main) must be specified in plugin config"
+  fi
+  source="$dir/main"
+  mkdir -p "$source"
+  echo "$main" > "$source/main.tf.json"
+  if [ -d "$src/modules" ]; then
+    ln -s "$src/modules" "$source"
+  else 
+    if [ -d "$CURRENT/modules" ]; then
+      if [ ! -h "$source/modules" ]; then
+        ln -s "$CURRENT/modules" "$source"
+      fi
+    fi
+  fi
+else
+   if ! isAbsolutePath "$source"; then
+     if [ -d "$src/$source" ]; then
+       source="$src/$source"
+     else
+       source="$CURRENT/$source"
+     fi
+   fi
+fi
+  
 
 deploy() {
+    info "project is $source"
     (
         cd "$dir"
         exec_cmd terraform init "$source"

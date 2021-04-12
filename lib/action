@@ -477,11 +477,14 @@ exec_plugin()
     return
   fi
 
-  getValue key path spec
+  getValue key key spec
   getValue cpath path spec
   getJSON config config spec
   getValueList args args spec
   
+  if [ -z "$key" ]; then
+    key="$cpath"
+  fi
   if [ -z "$key" ]; then
     if [ ${#args[@]} -gt 0 ]; then
       key="${args[0]}"
