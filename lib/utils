@@ -957,6 +957,12 @@ lookupPlugin() {
 
 lookupStub() {
   local dirs=( )
+  if isInternet "$1"; then
+    if  curl -sfI "$1" >/dev/null; then
+      echo "$1"
+    fi
+    return
+  fi
   productDirs dirs
   lookupFileIn "$1" "${dirs[@]}" "$CURRENT"  "$ROOT" "$SOW"
 }
@@ -1007,4 +1013,9 @@ killpg()
   if [ -n "${g## }" ]; then
     kill $s -- -${g## }
   fi
+}
+
+isInternet()
+{
+  [ "${1#https://}" != "$1" -o "${1#http://}" != "$1" ]
 }

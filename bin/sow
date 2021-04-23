@@ -20,6 +20,8 @@ TOOL="$(basename "$0")"
 
 VERSION="$(cat "$SOW/VERSION")"
 
+export SPIFF_FEATURES=interpolation
+
 get_version()
 {
   echo "$nTOOL version $VERSION"
@@ -85,6 +87,7 @@ help()
   found "    -e            export file"
   found "    -s            state file"
   found "    -d            deployment file"
+  found "    -l            print delta field list"
   title "Additional Commands:"
   CMDS_list_commands | CMDS_format_help
 }
@@ -797,7 +800,11 @@ showComponent()
           if [ -z "$stub" ]; then
             error "     - $i [${stubsrc[$i]}] (not found)"
           else
-            found "     - $i [${stubsrc[$i]}] (${stub#$ROOT/})"
+            if isInternet "$i"; then
+              found "     - $i [${stubsrc[$i]}] (internet)"
+            else
+              found "     - $i [${stubsrc[$i]}] (${stub#$ROOT/})"
+            fi
           fi
         done
       fi
@@ -1063,7 +1070,7 @@ _CMD_generate()
 
 CMD_diff()
 {
-  declare -A params=( [d]=deployment [e]=export [s]=state )
+  declare -A params=( [d]=deployment [e]=export [s]=state [l]=fieldlist )
   declare -A opts=( )
   OPT_parse_options params opts "$@"
   shift $(( _cnt - 1 ))
@@ -1090,7 +1097,11 @@ _diff()
 {
   if [ -f "$1/$2/$3.bak" ]; then
     title "Diff for $3 of $nCOMPONENT $2"
-    spiff diff "$1/$2/$3" "$1/$2/$3.bak"
+    if [ ${opts[fieldlist]+set} ]; then
+      spiff diff "$1/$2/$3" "$1/$2/$3.bak" | grep Differences
+    else
+      spiff diff "$1/$2/$3" "$1/$2/$3.bak"
+    fi
   else
     info "Nothing to compare for $3 of $nCOMPONENT $2"
   fi
