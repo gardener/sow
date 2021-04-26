@@ -114,7 +114,7 @@ getComponentJSON()
 {
   local stubs=( )
   setStubs stubs "lib/templates/component.yaml"
-  COMPONENTJSON="$(spiff merge --json "$1" "${stubs[@]}" "$CONFIG" - <<<'{ "env": { "COMPONENT": "'"$2"'", "PRODUCT": "'"$3"'" }}' )"
+  COMPONENTJSON="$(spiff merge --json "$1" "${stubs[@]}" "$CONFIG" - <<<'{ "env": { "<<": "(( &inject ))", "COMPONENT": "'"$2"'", "PRODUCT": "'"$3"'" }}' )"
   if [ -z "$COMPONENTJSON" ]; then
     COMPONENTJSON="{}"
   fi

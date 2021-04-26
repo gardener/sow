@@ -18,6 +18,7 @@ landscape: (( &temporary ))
 env: (( &temporary ))
 
 
+
 utilities:
   <<: (( &inject &temporary(merge || ~) ))
 
@@ -25,4 +26,16 @@ utilities:
     <<: (( merge ))
     Optional: (( components.isEnabled(.env.COMPONENT) ))
     isEnabled: (( |c|-> contains(_.landscape.activate || [],c) ))
+    activeFor: (( |field,value|-> field == value || false ))
+    proxy: (( |field,cond=""|-> *_.helper.proxy ))
+
+    helper:
+      <<: (( &temporary ))
+      proxy:
+        <<: (( &template ))
+        active: (( cond == "" ? true :cond ))
+        proxy: true
+        imports:
+           implementation: (( env.COMPONENT "/implementations/" field ))
+
 

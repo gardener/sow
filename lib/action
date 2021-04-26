@@ -757,7 +757,17 @@ handle_exports()
         fi
       done
     else
-      echo "---" > "$EXPORTDIR/export.yaml"
+      getValue proxy component.proxy COMPONENTJSON
+      if [ -n "$proxy" -a "$proxy" == true ]; then
+        if [ ${#import_map[@]} -ne 1 ]; then
+          error "proxy mode requires exactly one import (found ${#import_map[@]})"
+        fi
+        imp="${import_map[@]}"
+        info "proxying exports of $imp"
+        cp "$EXPORT/$imp/export.yaml" "$EXPORTDIR/export.yaml"
+      else
+        echo "---" > "$EXPORTDIR/export.yaml"
+      fi
     fi
   else
     if [ "$action" = "delete" ]; then

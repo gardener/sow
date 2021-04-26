@@ -292,6 +292,11 @@ So far, three fields are used:
 - `active`: boolean value indicating whether this component is active in
   the actual landscape.
 
+- `proxy`: boolean value the export forwarding should be enabled. If
+  active *sow* assumes this component to be a [proxy component](#proxy-components)
+  and forwards the exports of a sole dependency if no local `export.yaml` 
+  is present.
+
 - `plugins`: plugin definitions (see [deployment.yaml](#deploymentyaml))
   called before deployment evaluation (action `prepare`) and after deletion
   steps (action `cleanup`).
@@ -485,6 +490,81 @@ state file is omitted.
 If it contains a `files` section the listes files (structure with `path` and
 `data` fields) are written to the components export folder. Optionally the
 file mode is specified with `mode`.
+
+#### Proxy Components
+
+A common use case is to have special incarnations of a component for dediacted
+environments, for example a blobstore bucket for AWS/S3 or for google.
+The concrete implementation should often be hidden from the using components.
+This can be achieved by using proxy components acting as dependency target
+for using components.
+A dedicated component provides the generic export for all the implementations
+and internally depends on the selected implementation component, chosen by
+a dedicated landscape settings. This requires the use of two features of
+sow: optional dependencies and active/inactive components.
+
+Optional dependencies can be configured by accessing landscape settings fields
+during the processing of the `component.yaml`
+
+for example:
+
+```yaml
+landscape:
+
+component:
+  import:
+    implementation: (( env.COMPONENT "/implementations/" landscape.mycomp.flavor ))
+```
+
+This always declares one dependency (label `implementation`) to a dedcated 
+implementation component, located below the proxy component, depending on
+a flavor setting in the àcre.yaml`.
+
+The same way the various implementation components can use the same field to activate/deactivate
+themselfs:
+
+for example:
+
+```yaml
+landscape: 
+    
+component:
+  active: (( landscape.mycomp.flavor == "myflavor" ))
+```
+
+If all the implementation flavors use this pattern just matching the corresponding
+flavor name, this assures that always one implementation can be active, with an
+established dependency from the proxy component.
+ 
+If the export contract for implementation components is aligned the proxy component
+just forwards the export of its selected implementation component.
+
+*sow* directly supports those scenarios out-of-the-box by providing an appropriate
+spiff function in a stub file used for the processing of the `component.yaml`.
+
+Using this mechanism pure proxy components could look like this:
+
+```
+landscape:
+component: (( utilities.components.proxy(landscape.cluster.etcd.bucket.type) ))
+```
+
+This function, which takes the flavor as argument,  generates a complete `component`
+field according to the manual example above. The implementation components are assumed
+to be named according the selected flavor below an `implementations` folder.
+Additionally it sets a field `proxy` to `true`.
+
+
+If the `proxy` attribute is set to true, *sow* automatically forwards the
+export of a sole dependency if no local `export.yaml` is present for the
+proxy component.
+
+Similar scenarios could for example directly use a component specified in the `acre.yaml`
+to be used as implementation. This way some kind of interface component can be 
+described whose implementation is completely landscape dependent. It could even be
+provided by a different `greenhouse`. This allows to provide incomplete greenhouses,
+whose usage must be completed by orchestration of implementation components
+in the context of a using installation landscape (or higher level greenhouse aggregation).
 
 ### Templates
 
