@@ -1378,9 +1378,14 @@ CMD_edit()
 CMD_vi()
 {
   declare -A params
-  params=( [c]="=component" [e]=export [s]=state [g]=gen [l]=local [r]=root [p]=product [L]=)
+  params=( [c]="=component" [a]=acre [e]=export [s]=state [g]=gen [l]=local [r]=root [p]=product [L]=)
   OPT_parse_options params opts "$@"
   shift $(( _cnt - 1 ))
+
+  if [ "${opts[acre]+set}" ]; then
+    action_edit
+    return
+  fi
 
   local comp="${opts[component]}"
   if [ -z "$comp" ]; then
@@ -1402,6 +1407,10 @@ action_edit()
   local search=( )
   for o in "${!opts[@]}"; do
     case "$o" in
+      acre)       if [ $# -eq 0 ]; then
+                    set config.json
+                  fi
+                  search=( "${search[@]}" "$GEN" );;
       export)     search=( "${search[@]}" "$EXPORTDIR" );;
       state)      search=( "${search[@]}" "$STATEDIR" );;
       gen)        search=( "${search[@]}" "$GENDIR" );;
