@@ -12,15 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM alpine:3.11
+FROM alpine:3.13
 ARG ARCH=amd64
 ARG GITHUB_PROFILE=ezeeyahoo
 
 RUN apk update && apk add --no-cache bash curl libc6-compat findutils apache2-utils
-RUN apk add git~=2.24
-RUN apk add terraform~=0.12
+RUN apk add git~=2
+RUN apk add terraform~=0.14
 RUN apk add jq~=1.6
-RUN curl -L -o /usr/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/v1.17.16/bin/linux/${ARCH}/kubectl \
+RUN curl -L -o /usr/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/v1.18.18/bin/linux/${ARCH}/kubectl \
     && chmod +x /usr/bin/kubectl
 RUN if [ "$ARCH" = "amd64" ] ; then curl -L -o kustomize-archive.tar.gz https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv3.5.4/kustomize_v3.5.4_linux_${ARCH}.tar.gz; \
     else curl -L -o kustomize-archive.tar.gz https://github.com/${GITHUB_PROFILE}/kustomize/releases/download/kustomize%2Fv3.5.4/kustomize_v3.5.4_linux_${ARCH}.tar.gz; fi \
@@ -35,8 +35,8 @@ RUN curl -L -o helm-archive.tar.gz https://get.helm.sh/helm-v3.2.4-linux-${ARCH}
     && cp helm-extract/linux-${ARCH}/helm /usr/bin/helm \
     && rm -rf helm-archive.tar.gz helm-extract \
     && chmod +x /usr/bin/helm
-RUN if [ "$ARCH" = "amd64" ] ; then curl -L -o spiff-archive.zip https://github.com/mandelsoft/spiff/releases/download/v1.5.0/spiff_linux_${ARCH}.zip; \
-    else curl -L -o spiff-archive.zip https://github.com/${GITHUB_PROFILE}/spiff/releases/download/v1.5.0/spiff_linux_${ARCH}.zip; fi \
+RUN if [ "$ARCH" = "amd64" ] ; then curl -L -o spiff-archive.zip https://github.com/mandelsoft/spiff/releases/download/v1.6.1/spiff_linux_${ARCH}.zip; \
+    else curl -L -o spiff-archive.zip https://github.com/${GITHUB_PROFILE}/spiff/releases/download/v1.6.1/spiff_linux_${ARCH}.zip; fi \
     && mkdir spiff-extract \
     && unzip -d spiff-extract spiff-archive.zip \
     && cp "spiff-extract/spiff++" /usr/bin/spiff \
