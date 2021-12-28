@@ -21,7 +21,7 @@ RUN apk add git~=2
 RUN apk add terraform~=0.14
 RUN apk add jq~=1.6
 RUN curl -L -o /usr/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/v1.21.5/bin/linux/${ARCH}/kubectl \
-    && chmod +x /usr/bin/kubectl
+    && chmod +x /usr/bin/kubectl && mkdir -p /.kube/cache && chmod -R 777 /.kube
 RUN if [ "$ARCH" = "amd64" ] ; then curl -L -o kustomize-archive.tar.gz https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv3.5.4/kustomize_v3.5.4_linux_${ARCH}.tar.gz; \
     else curl -L -o kustomize-archive.tar.gz https://github.com/${GITHUB_PROFILE}/kustomize/releases/download/kustomize%2Fv3.5.4/kustomize_v3.5.4_linux_${ARCH}.tar.gz; fi \
     && mkdir kustomize-extract \
