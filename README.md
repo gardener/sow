@@ -56,7 +56,7 @@ of a yaml document (`state.yaml`) or other files.
 The information flow is described by the component dependencies
 and an installation configuration.
 Therefore _sow_ processes the yaml documents with the
-[_spiff++_ in-domaim templating engine](https://github.com/mandelsoft/spiff/blob/master/README.md)
+[_spiff++_ in-domain templating engine](https://github.com/mandelsoft/spiff/blob/master/README.md)
 by providing appropriate merge stubs based on
 the exports of the dependencies and the last local state.
 This allows to describe the calculation of the effective document versions
