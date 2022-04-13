@@ -29,7 +29,7 @@ RUN if [ "$ARCH" = "amd64" ] ; then curl -L -o kustomize-archive.tar.gz https://
     && cp kustomize-extract/kustomize /usr/bin/kustomize \
     && rm -rf kustomize-archive.tar.gz kustomize-extract \
     && chmod +x /usr/bin/kustomize
-RUN curl -L -o helm-archive.tar.gz https://get.helm.sh/helm-v3.2.4-linux-${ARCH}.tar.gz \
+RUN curl -L -o helm-archive.tar.gz https://get.helm.sh/helm-v3.8.1-linux-${ARCH}.tar.gz \
     && mkdir helm-extract \
     && tar -xzf helm-archive.tar.gz -C helm-extract \
     && cp helm-extract/linux-${ARCH}/helm /usr/bin/helm \
