@@ -22,8 +22,11 @@ build: docker-image
 release: build docker-login docker-push
 
 .PHONY: docker-image
-docker-image:
-	@docker build -t $(IMAGE_REPOSITORY):$(IMAGE_TAG) -f docker/Dockerfile --rm .
+docker-image: docker-image-amd
+
+.PHONY: docker-image-amd
+docker-image-amd:
+	@docker build --platform=linux/amd64 -t ${IMAGE_REPOSITORY}:${IMAGE_TAG} -f docker/Dockerfile --rm .
 
 .PHONY: docker-login
 docker-login:
@@ -31,13 +34,13 @@ docker-login:
 
 .PHONY: docker-push
 docker-push:
-	@if ! docker images $(IMAGE_REPOSITORY) | awk '{ print $$2 }' | grep -q -F $(IMAGE_TAG); then echo "$(IMAGE_REPOSITORY) version $(IMAGE_TAG) is not yet built. Please run 'make docker-image'"; false; fi
-	@gcloud docker -- push $(IMAGE_REPOSITORY):$(IMAGE_TAG)
+	@if ! docker images ${IMAGE_REPOSITORY} | awk '{ print $$2 }' | grep -q -F ${IMAGE_TAG}; then echo "${IMAGE_REPOSITORY} version ${IMAGE_TAG} is not yet built. Please run 'make docker-image'"; false; fi
+	@gcloud docker -- push ${IMAGE_REPOSITORY}:${IMAGE_TAG}
 
 .PHONY: docker-image-ppc
 docker-image-ppc:
-	@docker build --build-arg ARCH=ppc64le -t $(IMAGE_REPOSITORY):$(IMAGE_TAG)-pcc -f docker/Dockerfile --rm .
+	@docker build --platform=linux/ppc64le -t ${IMAGE_REPOSITORY}:${IMAGE_TAG}-pcc -f docker/Dockerfile --rm .
 
 .PHONY: docker-image-arm
 docker-image-arm:
-	@docker build --build-arg ARCH=arm64 -t $(IMAGE_REPOSITORY):$(IMAGE_TAG)-arm -f docker/Dockerfile --rm .
+	@docker build --platform=linux/arm64 -t ${IMAGE_REPOSITORY}:${IMAGE_TAG}-arm -f docker/Dockerfile --rm .
