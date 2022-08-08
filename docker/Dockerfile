@@ -14,7 +14,8 @@
 
 FROM alpine:3.13
 ARG ARCH=amd64
-ARG GITHUB_PROFILE=ezeeyahoo
+ARG KUSTOMIZE_GITHUB_PROFILE=kubernetes-sigs
+ARG SPIFF_GITHUB_PROFILE=mandelsoft
 
 RUN apk update && apk add --no-cache bash curl libc6-compat findutils apache2-utils
 RUN apk add git~=2
@@ -22,8 +23,7 @@ RUN apk add terraform~=0.14
 RUN apk add jq~=1.6
 RUN curl -L -o /usr/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/v1.21.5/bin/linux/${ARCH}/kubectl \
     && chmod +x /usr/bin/kubectl && mkdir -p /.kube/cache && chmod -R 777 /.kube
-RUN if [ "$ARCH" = "amd64" ] ; then curl -L -o kustomize-archive.tar.gz https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv3.5.4/kustomize_v3.5.4_linux_${ARCH}.tar.gz; \
-    else curl -L -o kustomize-archive.tar.gz https://github.com/${GITHUB_PROFILE}/kustomize/releases/download/kustomize%2Fv3.5.4/kustomize_v3.5.4_linux_${ARCH}.tar.gz; fi \
+RUN curl -L -o kustomize-archive.tar.gz https://github.com/${KUSTOMIZE_GITHUB_PROFILE}/kustomize/releases/download/kustomize%2Fv4.5.4/kustomize_v4.5.4_linux_${ARCH}.tar.gz \
     && mkdir kustomize-extract \
     && tar -xzf kustomize-archive.tar.gz -C kustomize-extract \
     && cp kustomize-extract/kustomize /usr/bin/kustomize \
@@ -35,8 +35,7 @@ RUN curl -L -o helm-archive.tar.gz https://get.helm.sh/helm-v3.8.1-linux-${ARCH}
     && cp helm-extract/linux-${ARCH}/helm /usr/bin/helm \
     && rm -rf helm-archive.tar.gz helm-extract \
     && chmod +x /usr/bin/helm
-RUN if [ "$ARCH" = "amd64" ] ; then curl -L -o spiff-archive.zip https://github.com/mandelsoft/spiff/releases/download/v1.6.1/spiff_linux_${ARCH}.zip; \
-    else curl -L -o spiff-archive.zip https://github.com/${GITHUB_PROFILE}/spiff/releases/download/v1.6.1/spiff_linux_${ARCH}.zip; fi \
+RUN curl -L -o spiff-archive.zip https://github.com/${SPIFF_GITHUB_PROFILE}/spiff/releases/download/v1.7.0-beta-3/spiff_linux_${ARCH}.zip \
     && mkdir spiff-extract \
     && unzip -d spiff-extract spiff-archive.zip \
     && cp "spiff-extract/spiff++" /usr/bin/spiff \

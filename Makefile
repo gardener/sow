@@ -34,5 +34,10 @@ docker-push:
 	@if ! docker images $(IMAGE_REPOSITORY) | awk '{ print $$2 }' | grep -q -F $(IMAGE_TAG); then echo "$(IMAGE_REPOSITORY) version $(IMAGE_TAG) is not yet built. Please run 'make docker-image'"; false; fi
 	@gcloud docker -- push $(IMAGE_REPOSITORY):$(IMAGE_TAG)
 
+.PHONY: docker-image-ppc
 docker-image-ppc:
-	docker build --build-arg ARCH=ppc64le -t $(IMAGE_REPOSITORY):$(IMAGE_TAG)-pcc -f docker/Dockerfile --rm .
+	@docker build --build-arg ARCH=ppc64le -t $(IMAGE_REPOSITORY):$(IMAGE_TAG)-pcc -f docker/Dockerfile --rm .
+
+.PHONY: docker-image-arm
+docker-image-arm:
+	@docker build --build-arg ARCH=arm64 -t $(IMAGE_REPOSITORY):$(IMAGE_TAG) -f docker/Dockerfile --rm .

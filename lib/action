@@ -584,7 +584,6 @@ exec_plugin()
     fi
   fi
 
-  rm -f "$GENDIR/deployment.json"
   if [ -n "$PLUGINCONFIG" ]; then
     rm -f "$PLUGINCONFIG"
   fi
@@ -635,7 +634,6 @@ _exec_plugin()
      fi
   fi
 
-  rm -f "$GENDIR/deployment.json"
   rm -f "$PLUGINCONFIG"
 }
 
