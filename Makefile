@@ -40,4 +40,4 @@ docker-image-ppc:
 
 .PHONY: docker-image-arm
 docker-image-arm:
-	@docker build --build-arg ARCH=arm64 -t $(IMAGE_REPOSITORY):$(IMAGE_TAG) -f docker/Dockerfile --rm .
+	@docker build --build-arg ARCH=arm64 -t $(IMAGE_REPOSITORY):$(IMAGE_TAG)-arm -f docker/Dockerfile --rm .
