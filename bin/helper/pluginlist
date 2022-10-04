@@ -52,7 +52,7 @@ CMD_del()
 case "$1" in 
   reset) CMD_reset;;
   update) CMD_update last;;
-  deploy) CMD_set "$2" "$3";;
+  deploy) CMD_set "$2" "$(cat "$3")";;
   delete) CMD_del "$2";;
 esac
 

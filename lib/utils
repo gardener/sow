@@ -1019,3 +1019,11 @@ isInternet()
 {
   [ "${1#https://}" != "$1" -o "${1#http://}" != "$1" ]
 }
+
+sha1()
+{
+  sha1sum <<< "$1" | (
+    read a b
+    echo "$a"
+  )
+}

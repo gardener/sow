@@ -570,14 +570,17 @@ exec_plugin()
             jsonAddString ajson "$a"
           done
           setjsonjson spec args "[ $ajson ]"
+          specfile=${TMP_NAME}$(sha1 "$spec")
+          echo "$spec" > "$specfile"
           if [ "$action" == deploy ]; then
-            synchronized "$SOW/bin/helper/pluginlist" $action "$key" "$spec"
+            synchronized "$SOW/bin/helper/pluginlist" $action "$key" "$specfile"
           fi
 
           __exec_plugin "${name}" "${key}" "$plugin" "${plugin_opts[@]}" "$action" "${args[@]}"
           if [ "$action" == delete ]; then
-            synchronized "$SOW/bin/helper/pluginlist" $action "$key" "$spec"
+            synchronized "$SOW/bin/helper/pluginlist" $action "$key" "$specfile"
           fi
+          rm -f "$specfile"
        else
          fail "no action function or plugin with name '${name}' found"
        fi
