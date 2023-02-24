@@ -37,7 +37,7 @@ RUN curl -L -o helm-archive.tar.gz https://get.helm.sh/helm-v3.8.1-linux-${TARGE
     && cp helm-extract/linux-${TARGETARCH}/helm /usr/bin/helm \
     && rm -rf helm-archive.tar.gz helm-extract \
     && chmod +x /usr/bin/helm
-RUN curl -L -o spiff-archive.zip https://github.com/${SPIFF_GITHUB_PROFILE}/spiff/releases/download/v1.7.0-beta-3/spiff_linux_${TARGETARCH}.zip \
+RUN curl -L -o spiff-archive.zip https://github.com/${SPIFF_GITHUB_PROFILE}/spiff/releases/download/v1.7.0-beta-4/spiff_linux_${TARGETARCH}.zip \
     && mkdir spiff-extract \
     && unzip -d spiff-extract spiff-archive.zip \
     && cp "spiff-extract/spiff++" /usr/bin/spiff \
