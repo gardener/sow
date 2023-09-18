@@ -34,7 +34,7 @@ action_delete_CustomResourceDefinition_apiextensions_k8s_io() {
         debug "CRD is in 'gardener.cloud' group, checking for deletion-protected annotation ..."
         if [[ $(kubectl --kubeconfig "$3" get crd "$1" -o json | jq -r '.metadata.labels["gardener.cloud/deletion-protected"]') == "true" ]]; then
           verbose "Annotate crd to enable deletion ..."
-          exec_cmd kubectl --kubeconfig "$3" annotate crd "$1" "confirmation.gardener.cloud/deletion=true"
+          exec_cmd kubectl --kubeconfig "$3" annotate crd "$1" "confirmation.gardener.cloud/deletion=true" --overwrite
         fi
       fi
       exec_cmd kubectl --kubeconfig "$3" delete crd "$1" --wait=false
