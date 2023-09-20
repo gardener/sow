@@ -23,15 +23,15 @@ RUN apk update && apk add --no-cache bash curl libc6-compat findutils apache2-ut
 RUN apk add git~=2
 RUN apk add terraform~=0.14
 RUN apk add jq~=1.6
-RUN curl -L -o /usr/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/v1.21.5/bin/linux/${TARGETARCH}/kubectl \
+RUN curl -L -o /usr/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/v1.27.6/bin/linux/${TARGETARCH}/kubectl \
     && chmod +x /usr/bin/kubectl && mkdir -p /.kube/cache && chmod -R 777 /.kube
-RUN curl -L -o kustomize-archive.tar.gz https://github.com/${KUSTOMIZE_GITHUB_PROFILE}/kustomize/releases/download/kustomize%2Fv4.5.4/kustomize_v4.5.4_linux_${TARGETARCH}.tar.gz \
+RUN curl -L -o kustomize-archive.tar.gz https://github.com/${KUSTOMIZE_GITHUB_PROFILE}/kustomize/releases/download/kustomize%2Fv5.1.1/kustomize_v5.1.1_linux_${TARGETARCH}.tar.gz \
     && mkdir kustomize-extract \
     && tar -xzf kustomize-archive.tar.gz -C kustomize-extract \
     && cp kustomize-extract/kustomize /usr/bin/kustomize \
     && rm -rf kustomize-archive.tar.gz kustomize-extract \
     && chmod +x /usr/bin/kustomize
-RUN curl -L -o helm-archive.tar.gz https://get.helm.sh/helm-v3.8.1-linux-${TARGETARCH}.tar.gz \
+RUN curl -L -o helm-archive.tar.gz https://get.helm.sh/helm-v3.12.3-linux-${TARGETARCH}.tar.gz \
     && mkdir helm-extract \
     && tar -xzf helm-archive.tar.gz -C helm-extract \
     && cp helm-extract/linux-${TARGETARCH}/helm /usr/bin/helm \
