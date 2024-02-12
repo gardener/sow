@@ -11,6 +11,7 @@
 ---
 
 # Sow - a tiny Installation Orchestration Framework
+[![REUSE status](https://api.reuse.software/badge/github.com/gardener/sow)](https://api.reuse.software/info/github.com/gardener/sow)
 
 _Sow_ is not yet another installation tool. It is
 not able to handle installation steps by its own.
